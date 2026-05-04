@@ -1,0 +1,22 @@
+[package]
+name = "ecc-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ecc-config = { path = "../ecc-config" }
+tokio = { workspace = true }
+hyper = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+chrono = { workspace = true }
+http = { workspace = true }
+bytes = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"

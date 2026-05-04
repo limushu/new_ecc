@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ecc</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Hero -->
+  <div class="hero">
+    <div class="hero-mesh"></div>
+    <div class="hero-orb hero-orb-1"></div>
+    <div class="hero-orb hero-orb-2"></div>
+    <div class="hero-orb hero-orb-3"></div>
+    <div class="hero-content">
+      <div class="hero-badge"><span class="hero-badge-dot"></span> Proxy Running
+        <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle theme">
+          <svg class="theme-icon-dark" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          <svg class="theme-icon-light" width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z"/></svg>
+        </button>
+      </div>
+      <h1>ecc</h1>
+      <p class="hero-sub">Route your Claude Code requests to any AI provider. Configure model mappings, monitor usage, and switch providers — all from one dashboard.</p>
+      <div class="hero-meta">
+        <span>Proxy :4010</span>
+        <span>Admin :4011</span>
+      </div>
+    </div>
+    <div class="hero-divider"></div>
+  </div>
+
+  <div class="stats-strip">
+    <div class="stat"><div class="stat-val" id="stat-requests">0</div><div class="stat-lbl">Requests</div></div>
+    <div class="stat"><div class="stat-val" id="stat-input">0</div><div class="stat-lbl">Input</div></div>
+    <div class="stat"><div class="stat-val" id="stat-output">0</div><div class="stat-lbl">Output</div></div>
+    <div class="stat"><div class="stat-val" id="stat-cost">$0</div><div class="stat-lbl">Cost</div></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="routes">Routes</button>
+    <button class="tab" data-tab="usage">Usage</button>
+    <button class="tab" data-tab="playground">Playground</button>
+  </div>
+
+  <!-- Routes Panel -->
+  <div id="panel-routes" class="tab-panel active">
+    <div class="section-head">
+      <div class="section-title">Model Routes</div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="tooltip-wrap">
+          <span class="help-tip">?</span>
+          <span class="tooltip">Map a Claude model name to any AI provider endpoint</span>
+        </div>
+        <button class="btn btn-primary" onclick="openRouteModal()">+ Add Route</button>
+      </div>
+    </div>
+
+    <div class="provider-cards" id="provider-cards"></div>
+  </div>
+
+  <!-- Usage Panel -->
+  <div id="panel-usage" class="tab-panel">
+    <div class="section-head"><div class="section-title">Model Usage</div></div>
+    <div class="chart-card" style="position:relative;">
+      <div id="barWrap" style="position:relative;"><canvas id="barChart"></canvas></div>
+    </div>
+
+    <div class="section-head">
+      <div class="section-title" id="timeline-title">Usage Timeline</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <select id="gran-select" class="gran-sel" onchange="onGranChange()">
+          <option value="hour">Hour</option>
+          <option value="day" selected>Day</option>
+          <option value="week">Week</option>
+          <option value="month">Month</option>
+        </select>
+        <button class="btn btn-primary" id="timeline-back" style="display:none;" onclick="timelineGoBack()">&#8592; Back</button>
+      </div>
+    </div>
+    <div class="chart-card"><canvas id="timelineChart" height="200"></canvas></div>
+  </div>
+
+  <!-- Playground Panel -->
+  <div id="panel-playground" class="tab-panel">
+    <div class="pg-layout">
+      <div class="pg-sidebar">
+        <div class="form-group">
+          <label>Model</label>
+          <select id="pg-model"></select>
+        </div>
+        <button class="pg-adv-toggle" onclick="togglePgAdv()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          Advanced
+        </button>
+        <div id="pg-adv" class="pg-adv-panel">
+          <div class="form-group">
+            <label>System Prompt</label>
+            <textarea id="pg-system" rows="2" placeholder="You are a helpful assistant..."></textarea>
+          </div>
+          <div class="form-group">
+            <label>Max Tokens</label>
+            <input type="number" id="pg-max-tokens" value="4096" min="1" max="64000">
+          </div>
+        </div>
+        <div class="pg-hint">Enter to send, Shift+Enter for new line.</div>
+      </div>
+      <div class="pg-main">
+        <div class="pg-chat" id="pg-chat">
+          <div class="pg-empty">
+            <div class="pg-empty-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+              </svg>
+            </div>
+            <p><strong>Test your model routes</strong></p>
+            <p>Select a model, type a message, and hit Send.</p>
+          </div>
+        </div>
+        <div class="pg-input-bar">
+          <div class="pg-input-wrap">
+            <textarea id="pg-input" rows="2" placeholder="Type your message..." onkeydown="pgOnKey(event)"></textarea>
+          </div>
+          <button class="pg-send-btn" id="pg-send-btn" onclick="pgSend()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Add Route Modal -->
+<div id="route-modal" class="modal">
+  <div class="modal-overlay" onclick="closeModal()"></div>
+  <div class="modal-content">
+    <h3 id="modal-title">Add Route</h3>
+
+    <!-- Provider -->
+    <div class="form-group">
+      <label>Provider</label>
+      <select id="modal-provider" onchange="onProviderChange()">
+        <option value="">Select provider</option>
+        <option value="__new__">+ New Provider</option>
+      </select>
+    </div>
+
+    <!-- Inline new-provider form (only visible when "+ New Provider" selected) -->
+    <div id="modal-new-provider" class="modal-inline-form">
+      <div class="form-group">
+        <label>Quick Setup</label>
+        <select id="modal-template" onchange="onTemplateChange()">
+          <option value="">Choose a template…</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Provider Name</label>
+        <input type="text" id="modal-new-name" placeholder="e.g. my-deepseek">
+      </div>
+      <div class="form-group">
+        <label>Base URL</label>
+        <input type="text" id="modal-new-url" placeholder="https://api.deepseek.com">
+      </div>
+      <div class="form-group">
+        <label>Auth Token</label>
+        <input type="text" id="modal-new-token" placeholder="sk-...">
+      </div>
+      <div class="form-row">
+        <div>
+          <label>Protocol</label>
+          <select id="modal-new-protocol">
+            <option value="openai">OpenAI</option>
+            <option value="anthropic">Anthropic</option>
+          </select>
+        </div>
+        <div>
+          <label>Auth Type</label>
+          <select id="modal-new-auth">
+            <option value="bearer">Bearer</option>
+            <option value="api_key">API Key</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Claude Model -->
+    <div class="form-group">
+      <label>Claude Model</label>
+      <select id="modal-claude-select" onchange="syncField('modal-claude-select','modal-claude-input')">
+        <option value="">Select or type below</option>
+        <option value="claude-sonnet-4-6">claude-sonnet-4-6</option>
+        <option value="claude-opus-4-7">claude-opus-4-7</option>
+        <option value="claude-haiku-4-5">claude-haiku-4-5</option>
+      </select>
+      <input type="text" id="modal-claude-input" placeholder="Or type model name" style="margin-top:8px;">
+    </div>
+
+    <!-- Target Model -->
+    <div class="form-group">
+      <label>Provider Model</label>
+      <select id="modal-target-select" onchange="syncField('modal-target-select','modal-target-input')">
+        <option value="">Select or type below</option>
+      </select>
+      <input type="text" id="modal-target-input" placeholder="Or type target model" style="margin-top:8px;">
+    </div>
+
+    <div style="display:flex;gap:12px;margin-top:24px;">
+      <button class="btn btn-primary" id="modal-submit" onclick="submitRoute()">Add Route</button>
+      <button class="btn" style="background:var(--surface-3);color:var(--text-2);" onclick="closeModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div class="toast-container" id="toast-container"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>

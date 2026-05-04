@@ -1,0 +1,20 @@
+name = "DeepSeek"
+base_url = "https://api.deepseek.com"
+protocol = "openai"
+auth_type = "bearer"
+
+[[models]]
+id = "deepseek-chat"
+name = "DeepSeek V3"
+
+[[models]]
+id = "deepseek-reasoner"
+name = "DeepSeek R1"
+
+[pricing."deepseek-chat"]
+input_per_m = 1.0
+output_per_m = 2.0
+
+[pricing."deepseek-reasoner"]
+input_per_m = 4.0
+output_per_m = 16.0

@@ -121,6 +121,10 @@ impl AdminServer {
             ("GET", "/api/presets") => self.list_presets().await,
 
             // Usage
+            ("GET", "/api/usage/detail") => {
+                let query = req.uri().query().unwrap_or("");
+                self.usage_detail(query).await
+            }
             ("GET", p) if p.starts_with("/api/usage") => {
                 let query = req.uri().query().unwrap_or("");
                 self.usage_stats(query).await
@@ -420,6 +424,104 @@ impl AdminServer {
                 .unwrap_or_default();
                 json_response(json)
             }
+            Err(e) => error_response(StatusCode::INTERNAL_SERVER_ERROR, &format!("{e}")),
+        }
+    }
+
+    async fn usage_detail(&self, query: &str) -> Response<BoxBody> {
+        let params: HashMap<String, String> = parse_query(query);
+        let provider = params.get("provider").cloned().unwrap_or_default();
+        let target_model = params.get("model").cloned().unwrap_or_default();
+        let days: usize = params.get("days").and_then(|d| d.parse().ok()).unwrap_or(7);
+
+        if provider.is_empty() || target_model.is_empty() {
+            return error_response(StatusCode::BAD_REQUEST, "provider and model are required");
+        }
+
+        let store = ecc_core::usage::UsageStore::new(self.usage_dir.clone(), 0);
+        let today = chrono::Utc::now().date_naive();
+        let mut all_records = Vec::new();
+
+        for i in 0..days {
+            let date = (today - chrono::TimeDelta::days(i as i64))
+                .format("%Y-%m-%d")
+                .to_string();
+            if let Ok(mut recs) = store.read_daily(&date) {
+                all_records.append(&mut recs);
+            }
+        }
+
+        let filtered: Vec<_> = all_records
+            .into_iter()
+            .filter(|r| r.provider == provider && r.target_model == target_model)
+            .collect();
+
+        // Aggregate by hour for today
+        let mut hourly: HashMap<String, serde_json::Value> = HashMap::new();
+        let today_str = today.format("%Y-%m-%d").to_string();
+        for rec in &filtered {
+            if rec.ts.starts_with(&today_str) {
+                let hour = if rec.ts.len() >= 13 {
+                    rec.ts[11..13].to_string()
+                } else {
+                    "00".to_string()
+                };
+                let entry = hourly.entry(hour.clone()).or_insert_with(|| {
+                    serde_json::json!({"hour": hour, "requests": 0u64, "input": 0u64, "output": 0u64, "cost": 0.0f64})
+                });
+                entry["requests"] = serde_json::json!(entry["requests"].as_u64().unwrap() + 1);
+                entry["input"] = serde_json::json!(entry["input"].as_u64().unwrap() + rec.input_tokens);
+                entry["output"] = serde_json::json!(entry["output"].as_u64().unwrap() + rec.output_tokens);
+                entry["cost"] = serde_json::json!(entry["cost"].as_f64().unwrap() + rec.cost_usd);
+            }
+        }
+
+        // Aggregate by day
+        let mut daily: HashMap<String, serde_json::Value> = HashMap::new();
+        for rec in &filtered {
+            let day = rec.ts[..10].to_string();
+            let entry = daily.entry(day.clone()).or_insert_with(|| {
+                serde_json::json!({"date": day, "requests": 0u64, "input": 0u64, "output": 0u64, "cost": 0.0f64})
+            });
+            entry["requests"] = serde_json::json!(entry["requests"].as_u64().unwrap() + 1);
+            entry["input"] = serde_json::json!(entry["input"].as_u64().unwrap() + rec.input_tokens);
+            entry["output"] = serde_json::json!(entry["output"].as_u64().unwrap() + rec.output_tokens);
+            entry["cost"] = serde_json::json!(entry["cost"].as_f64().unwrap() + rec.cost_usd);
+        }
+
+        // Summary
+        let total_requests = filtered.len() as u64;
+        let total_input: u64 = filtered.iter().map(|r| r.input_tokens).sum();
+        let total_output: u64 = filtered.iter().map(|r| r.output_tokens).sum();
+        let total_cost: f64 = filtered.iter().map(|r| r.cost_usd).sum();
+
+        // Recent records (last 50)
+        let mut recent = filtered.clone();
+        recent.sort_by(|a, b| b.ts.cmp(&a.ts));
+        recent.truncate(50);
+
+        let mut hourly_list: Vec<_> = hourly.into_values().collect();
+        hourly_list.sort_by(|a, b| a["hour"].as_str().cmp(&b["hour"].as_str()));
+
+        let mut daily_list: Vec<_> = daily.into_values().collect();
+        daily_list.sort_by(|a, b| a["date"].as_str().cmp(&b["date"].as_str()));
+
+        let json = serde_json::json!({
+            "provider": provider,
+            "target_model": target_model,
+            "summary": {
+                "total_requests": total_requests,
+                "total_input_tokens": total_input,
+                "total_output_tokens": total_output,
+                "total_cost_usd": total_cost,
+            },
+            "hourly": hourly_list,
+            "daily": daily_list,
+            "recent": recent,
+        });
+
+        match serde_json::to_string(&json) {
+            Ok(s) => json_response(s),
             Err(e) => error_response(StatusCode::INTERNAL_SERVER_ERROR, &format!("{e}")),
         }
     }

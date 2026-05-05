@@ -281,6 +281,31 @@
   </div>
 </div>
 
+<!-- Detail Modal -->
+<div id="detail-modal" class="modal">
+  <div class="modal-overlay" onclick="closeDetail()"></div>
+  <div class="modal-content modal-detail">
+    <div class="detail-head">
+      <h3 id="detail-title">Model Detail</h3>
+      <button class="btn" style="background:var(--surface-3);color:var(--text-2);" onclick="closeDetail()">Close</button>
+    </div>
+    <div class="detail-summary" id="detail-summary"></div>
+    <div class="detail-section">
+      <div class="detail-section-title">Request Trend</div>
+      <canvas id="detailChart" height="160"></canvas>
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-title">Recent Requests</div>
+      <div class="detail-table-wrap">
+        <table class="detail-table" id="detail-table">
+          <thead><tr><th>Time</th><th>Claude Model</th><th>Input</th><th>Output</th><th>Latency</th><th>Status</th></tr></thead>
+          <tbody id="detail-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Toast container -->
 <div class="toast-container" id="toast-container"></div>
 

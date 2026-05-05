@@ -526,6 +526,25 @@ select {
 [data-theme="light"] .provider-card-head { border-bottom-color: rgba(0,0,0,0.06); }
 [data-theme="light"] .tab.active { background: var(--surface); }
 
+/* Detail modal */
+.modal-detail { max-width: 720px; width: 90vw; max-height: 85vh; overflow-y: auto; }
+.detail-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.detail-head h3 { margin: 0; font-size: 16px; }
+.detail-summary { display: flex; gap: 16px; margin-bottom: 20px; }
+.detail-stat { flex: 1; text-align: center; padding: 12px; background: var(--surface-2); border-radius: var(--radius-sm); }
+.detail-stat-val { font-size: 20px; font-weight: 700; color: var(--text); }
+.detail-stat-lbl { font-size: 11px; color: var(--text-2); margin-top: 4px; }
+.detail-section { margin-bottom: 20px; }
+.detail-section-title { font-size: 13px; font-weight: 600; color: var(--text-2); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+.detail-table-wrap { overflow-x: auto; }
+.detail-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.detail-table th { text-align: left; color: var(--text-3); font-weight: 500; padding: 6px 10px; border-bottom: 1px solid var(--surface-3); }
+.detail-table td { padding: 7px 10px; border-bottom: 1px solid var(--surface-2); color: var(--text-2); }
+.detail-table tr:hover td { background: var(--surface-2); }
+.detail-status-ok { color: var(--green); font-weight: 600; }
+.detail-status-err { color: var(--red); font-weight: 600; }
+.detail-loading { text-align: center; padding: 32px; color: var(--text-3); }
+
 @media (max-width: 640px) {
   .stats-strip { grid-template-columns: repeat(2, 1fr); }
   .hero h1 { font-size: 36px; }

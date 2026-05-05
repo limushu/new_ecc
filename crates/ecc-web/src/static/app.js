@@ -329,9 +329,82 @@ function submitEditRoute() {
     }).catch(function(e) { toast('Error: ' + e.message, 'error'); });
 }
 
-// --- Model Detail (placeholder for #3) ---
+// --- Model Detail ---
+var detailChart = null;
+
 function showModelDetail(provider, model) {
-  toast('Detail view for ' + provider + ' / ' + model + ' — coming soon', 'error');
+  document.getElementById('detail-title').textContent = provider + ' / ' + model;
+  document.getElementById('detail-summary').innerHTML = '<div class="detail-loading">Loading...</div>';
+  document.getElementById('detail-tbody').innerHTML = '';
+  if (detailChart) { detailChart.destroy(); detailChart = null; }
+  document.getElementById('detail-modal').style.display = 'flex';
+
+  fetch(API + '/api/usage/detail?provider=' + encodeURIComponent(provider) + '&model=' + encodeURIComponent(model) + '&days=7')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var s = data.summary || {};
+      document.getElementById('detail-summary').innerHTML =
+        '<div class="detail-stat"><div class="detail-stat-val">' + (s.total_requests || 0) + '</div><div class="detail-stat-lbl">Requests</div></div>' +
+        '<div class="detail-stat"><div class="detail-stat-val">' + fmt(s.total_input_tokens || 0) + '</div><div class="detail-stat-lbl">Input</div></div>' +
+        '<div class="detail-stat"><div class="detail-stat-val">' + fmt(s.total_output_tokens || 0) + '</div><div class="detail-stat-lbl">Output</div></div>' +
+        '<div class="detail-stat"><div class="detail-stat-val">$' + (s.total_cost_usd || 0).toFixed(4) + '</div><div class="detail-stat-lbl">Cost</div></div>';
+
+      // Build trend chart from daily data
+      var daily = data.daily || [];
+      if (daily.length) {
+        var ctx = document.getElementById('detailChart').getContext('2d');
+        detailChart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: daily.map(function(d) { return d.date.slice(5); }),
+            datasets: [
+              { label: 'Requests', data: daily.map(function(d) { return d.requests; }), borderColor: '#818cf8', backgroundColor: '#818cf818', borderWidth: 2, tension: 0.3, fill: true, yAxisID: 'y' },
+              { label: 'Tokens', data: daily.map(function(d) { return d.input + d.output; }), borderColor: '#34d399', backgroundColor: '#34d39918', borderWidth: 2, tension: 0.3, fill: true, yAxisID: 'y1' }
+            ]
+          },
+          options: {
+            responsive: true,
+            interaction: { mode: 'index', intersect: false },
+            scales: {
+              x: { ticks: { color: '#52525b', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,0.03)' }, border: { display: false } },
+              y: { position: 'left', ticks: { color: '#818cf8', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,0.03)' }, border: { display: false }, beginAtZero: true, title: { display: true, text: 'Requests', color: '#818cf8' } },
+              y1: { position: 'right', ticks: { color: '#34d399', font: { size: 11 }, callback: function(v) { return fmt(v); } }, grid: { display: false }, border: { display: false }, beginAtZero: true, title: { display: true, text: 'Tokens', color: '#34d399' } }
+            },
+            plugins: {
+              legend: { labels: { color: '#a1a1aa', usePointStyle: true, pointStyle: 'circle', padding: 14, font: { size: 12 } } },
+              tooltip: { backgroundColor: '#18181b', titleColor: '#fafafa', bodyColor: '#fafafa', borderColor: '#27272a', borderWidth: 1, padding: 10 }
+            }
+          }
+        });
+      }
+
+      // Recent requests table
+      var tbody = document.getElementById('detail-tbody');
+      var recent = data.recent || [];
+      recent.forEach(function(r) {
+        var ts = r.ts ? r.ts.replace('T', ' ').slice(0, 19) : '';
+        var statusClass = r.status >= 400 ? 'detail-status-err' : 'detail-status-ok';
+        tbody.innerHTML +=
+          '<tr>' +
+          '<td>' + esc(ts) + '</td>' +
+          '<td>' + esc(r.model || '') + '</td>' +
+          '<td>' + fmt(r.input_tokens || 0) + '</td>' +
+          '<td>' + fmt(r.output_tokens || 0) + '</td>' +
+          '<td>' + (r.latency_ms || 0) + 'ms</td>' +
+          '<td><span class="' + statusClass + '">' + (r.status || 0) + '</span></td>' +
+          '</tr>';
+      });
+      if (!recent.length) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-3);padding:24px;">No requests found</td></tr>';
+      }
+    })
+    .catch(function(e) {
+      document.getElementById('detail-summary').innerHTML = '<div class="detail-loading">Error: ' + esc(e.message) + '</div>';
+    });
+}
+
+function closeDetail() {
+  document.getElementById('detail-modal').style.display = 'none';
 }
 
 function deleteRoute(model) {
@@ -551,6 +624,7 @@ document.addEventListener('keydown', function(e) {
     closeModal();
     closeEditProvider();
     closeEditRoute();
+    closeDetail();
   }
 });
 

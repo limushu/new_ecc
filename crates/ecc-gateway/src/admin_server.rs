@@ -59,24 +59,28 @@ impl AdminServer {
             quota_cache: Arc::new(RwLock::new(HashMap::new())),
         };
 
-        // Background quota refresher: every 20s
+        // Background quota refresher: one independent task per coding plan provider
         let cache = srv.quota_cache.clone();
         tokio::spawn(async move {
-            let client = reqwest::Client::new();
-            loop {
-                tokio::time::sleep(std::time::Duration::from_secs(20)).await;
-                let provs = providers.read().await;
-                let mut new_cache = HashMap::new();
-                for (name, provider) in &provs.providers {
-                    if provider.auth_token.trim().is_empty() { continue; }
-                    let result = ecc_core::coding_plan::get_quota(
-                        &client, &provider.base_url, &provider.auth_token,
-                    ).await;
-                    new_cache.insert(name.clone(), result);
-                }
-                drop(provs);
-                let mut cache = cache.write().await;
-                *cache = new_cache;
+            let provs = providers.read().await;
+            for (name, provider) in &provs.providers {
+                if !provider.is_coding_plan { continue; }
+                if provider.auth_token.trim().is_empty() { continue; }
+                let cache = cache.clone();
+                let pname: String = name.clone();
+                let url = provider.base_url.clone();
+                let key = provider.auth_token.clone();
+                let client = reqwest::Client::new();
+                tokio::spawn(async move {
+                    loop {
+                        let result = ecc_core::coding_plan::get_quota(&client, &url, &key).await;
+                        {
+                            let mut cache = cache.write().await;
+                            cache.insert(pname.clone(), result);
+                        }
+                        tokio::time::sleep(std::time::Duration::from_secs(20)).await;
+                    }
+                });
             }
         });
 

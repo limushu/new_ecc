@@ -517,12 +517,31 @@ function openRouteModal() {
 
 function addRouteTo(provider) {
   openRouteModal();
-  document.getElementById('modal-provider').value = provider;
+  // Lock provider selection to the given provider
+  var provSel = document.getElementById('modal-provider');
+  provSel.value = provider;
+  provSel.disabled = true;
   onProviderChange();
+  // Try to match a preset and populate target models
+  var tmpl = findTemplateByProvider(provider);
+  if (tmpl) {
+    populateTargetModels(tmpl, null);
+    populateClaudeModels(tmpl);
+  }
+}
+
+// Find a preset template that matches a provider name (case-insensitive)
+function findTemplateByProvider(providerName) {
+  var lower = providerName.toLowerCase();
+  for (var i = 0; i < templateData.length; i++) {
+    if (templateData[i].name.toLowerCase() === lower) return templateData[i];
+  }
+  return null;
 }
 
 function closeModal() {
   document.getElementById('route-modal').style.display = 'none';
+  document.getElementById('modal-provider').disabled = false;
 }
 
 function populateProviderSelect() {
@@ -537,6 +556,14 @@ function populateProviderSelect() {
 function onProviderChange() {
   var prov = document.getElementById('modal-provider').value;
   document.getElementById('modal-new-provider').style.display = (prov === '__new__') ? 'block' : 'none';
+  // When selecting an existing provider, populate target models from matching preset
+  if (prov && prov !== '__new__') {
+    var tmpl = findTemplateByProvider(prov);
+    if (tmpl) {
+      populateTargetModels(tmpl, null);
+      populateClaudeModels(tmpl);
+    }
+  }
 }
 
 // Template change: fill new-provider form fields from preset

@@ -307,6 +307,7 @@ body {
 .icon-btn svg { width: 14px; height: 14px; display: block; }
 .icon-btn:hover { background: var(--red-bg); color: var(--red); }
 .icon-btn-edit:hover { background: var(--accent-bg); color: var(--accent); }
+.icon-btn-chart:hover { background: rgba(34,211,238,0.08); color: #22d3ee; }
 .icon-bar { display: inline-flex; align-items: center; gap: 2px; }
 
 /* Inline expandable form inside modal */

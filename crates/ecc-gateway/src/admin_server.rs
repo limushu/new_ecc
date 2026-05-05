@@ -97,6 +97,11 @@ impl AdminServer {
             // Providers
             ("GET", "/api/providers") => self.list_providers().await,
             ("POST", "/api/providers") => self.create_provider(req).await,
+            ("PUT", p) if p.starts_with("/api/providers/") => {
+                let name = p.trim_start_matches("/api/providers/");
+                let name = percent_decode(name);
+                self.update_provider(req, &name).await
+            }
             ("DELETE", p) if p.starts_with("/api/providers/") => {
                 let name = p.trim_start_matches("/api/providers/");
                 let name = percent_decode(name);
@@ -226,6 +231,47 @@ impl AdminServer {
 
         ecc_info!(ADM_PROVIDER_CREATED, provider = %input.name, "provider created");
         json_response_with_status(StatusCode::CREATED, r#"{"ok":true}"#.to_string())
+    }
+
+    async fn update_provider(&self, req: Request<Incoming>, name: &str) -> Response<BoxBody> {
+        let body = match read_body(req).await {
+            Ok(b) => b,
+            Err(resp) => return resp,
+        };
+
+        #[derive(serde::Deserialize)]
+        struct UpdateProvider {
+            #[serde(default)]
+            base_url: Option<String>,
+            #[serde(default)]
+            auth_token: Option<String>,
+            #[serde(default)]
+            auth_type: Option<ecc_config::provider::AuthType>,
+            #[serde(default)]
+            protocol: Option<ecc_config::provider::Protocol>,
+        }
+
+        let input: UpdateProvider = match serde_json::from_slice(&body) {
+            Ok(v) => v,
+            Err(e) => return error_response(StatusCode::BAD_REQUEST, &format!("Invalid JSON: {e}")),
+        };
+
+        let mut table = self.providers.write().await;
+        let provider = match table.providers.get_mut(name) {
+            Some(p) => p,
+            None => return error_response(StatusCode::NOT_FOUND, "Provider not found"),
+        };
+        if let Some(v) = input.base_url { provider.base_url = v; }
+        if let Some(v) = input.auth_token { provider.auth_token = v; }
+        if let Some(v) = input.auth_type { provider.auth_type = v; }
+        if let Some(v) = input.protocol { provider.protocol = v; }
+
+        if let Err(e) = ecc_config::provider::save_providers(&self.providers_path, &table) {
+            ecc_error!(ADM_SAVE_ERROR, "Failed to save providers: {e}");
+            return error_response(StatusCode::INTERNAL_SERVER_ERROR, "Failed to save");
+        }
+
+        json_response(r#"{"ok":true}"#.to_string())
     }
 
     async fn delete_provider(&self, name: &str) -> Response<BoxBody> {

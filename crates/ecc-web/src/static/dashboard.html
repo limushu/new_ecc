@@ -219,6 +219,68 @@
   </div>
 </div>
 
+<!-- Edit Provider Modal -->
+<div id="edit-provider-modal" class="modal">
+  <div class="modal-overlay" onclick="closeEditProvider()"></div>
+  <div class="modal-content">
+    <h3>Edit Provider</h3>
+    <input type="hidden" id="ep-name">
+    <div class="form-group">
+      <label>Base URL</label>
+      <input type="text" id="ep-url" placeholder="https://api.deepseek.com">
+    </div>
+    <div class="form-group">
+      <label>Auth Token</label>
+      <input type="text" id="ep-token" placeholder="sk-...">
+    </div>
+    <div class="form-row">
+      <div>
+        <label>Protocol</label>
+        <select id="ep-protocol">
+          <option value="openai">OpenAI</option>
+          <option value="anthropic">Anthropic</option>
+        </select>
+      </div>
+      <div>
+        <label>Auth Type</label>
+        <select id="ep-auth">
+          <option value="bearer">Bearer</option>
+          <option value="api_key">API Key</option>
+        </select>
+      </div>
+    </div>
+    <div style="display:flex;gap:12px;margin-top:24px;">
+      <button class="btn btn-primary" onclick="submitEditProvider()">Save</button>
+      <button class="btn" style="background:var(--surface-3);color:var(--text-2);" onclick="closeEditProvider()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Route Modal -->
+<div id="edit-route-modal" class="modal">
+  <div class="modal-overlay" onclick="closeEditRoute()"></div>
+  <div class="modal-content">
+    <h3>Edit Route</h3>
+    <input type="hidden" id="er-orig-model">
+    <div class="form-group">
+      <label>Claude Model</label>
+      <input type="text" id="er-claude" placeholder="claude-sonnet-4-6">
+    </div>
+    <div class="form-group">
+      <label>Provider</label>
+      <input type="text" id="er-provider" readonly style="opacity:0.6">
+    </div>
+    <div class="form-group">
+      <label>Target Model</label>
+      <input type="text" id="er-target" placeholder="deepseek-chat">
+    </div>
+    <div style="display:flex;gap:12px;margin-top:24px;">
+      <button class="btn btn-primary" onclick="submitEditRoute()">Save</button>
+      <button class="btn" style="background:var(--surface-3);color:var(--text-2);" onclick="closeEditRoute()">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast container -->
 <div class="toast-container" id="toast-container"></div>
 

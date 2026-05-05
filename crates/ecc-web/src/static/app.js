@@ -126,6 +126,9 @@ function renderProviderCards() {
     head.innerHTML =
       '<div class="provider-card-name">' + esc(pn) + ' <span class="tag tag-protocol">' + esc(proto) + '</span></div>' +
       '<span class="icon-bar">' +
+      '<button class="icon-btn icon-btn-edit" title="Edit provider" onclick="editProvider(\'' + escJs(pn) + '\')">' +
+      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' +
+      '</button>' +
       '<button class="icon-btn" title="Delete provider" onclick="deleteProvider(\'' + escJs(pn) + '\')">' +
       '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>' +
       '</button></span>';
@@ -144,7 +147,13 @@ function renderProviderCards() {
         '<span class="route-target">' + esc(e.targetModel) + '</span>' +
         '</div>' +
         '<span class="icon-bar">' +
-        '<button class="icon-btn icon-btn-edit" title="Delete route" onclick="deleteRoute(\'' + escJs(e.claudeModel) + '\')">' +
+        '<button class="icon-btn icon-btn-chart" title="Usage detail" onclick="showModelDetail(\'' + escJs(pn) + '\',\'' + escJs(e.targetModel) + '\')">' +
+        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>' +
+        '</button>' +
+        '<button class="icon-btn icon-btn-edit" title="Edit route" onclick="editRoute(\'' + escJs(e.claudeModel) + '\',\'' + escJs(pn) + '\',\'' + escJs(e.targetModel) + '\')">' +
+        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' +
+        '</button>' +
+        '<button class="icon-btn" title="Delete route" onclick="deleteRoute(\'' + escJs(e.claudeModel) + '\')">' +
         '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>' +
         '</button></span>';
       body.appendChild(item);
@@ -244,6 +253,85 @@ function deleteProvider(name) {
       loadRoutes();
     })
     .catch(function(e) { toast('Error: ' + e.message, 'error'); });
+}
+
+// --- Edit Provider ---
+function editProvider(name) {
+  var p = allProviders[name] || {};
+  document.getElementById('ep-name').value = name;
+  document.getElementById('ep-url').value = p.base_url || '';
+  document.getElementById('ep-token').value = p.auth_token || '';
+  document.getElementById('ep-protocol').value = p.protocol || 'openai';
+  document.getElementById('ep-auth').value = p.auth_type || 'bearer';
+  document.getElementById('edit-provider-modal').style.display = 'flex';
+}
+
+function closeEditProvider() {
+  document.getElementById('edit-provider-modal').style.display = 'none';
+}
+
+function submitEditProvider() {
+  var name = document.getElementById('ep-name').value;
+  var data = {};
+  var url = document.getElementById('ep-url').value.trim();
+  var token = document.getElementById('ep-token').value.trim();
+  var proto = document.getElementById('ep-protocol').value;
+  var auth = document.getElementById('ep-auth').value;
+  if (url) data.base_url = url;
+  if (token) data.auth_token = token;
+  data.protocol = proto;
+  data.auth_type = auth;
+  fetch(API + '/api/providers/' + encodeURIComponent(name), {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(data)
+  }).then(function(r) {
+    if (!r.ok) return r.json().then(function(d) { throw new Error(d.error); });
+    toast('Provider "' + name + '" updated');
+    closeEditProvider();
+    loadRoutes();
+  }).catch(function(e) { toast('Error: ' + e.message, 'error'); });
+}
+
+// --- Edit Route ---
+function editRoute(model, provider, targetModel) {
+  document.getElementById('er-orig-model').value = model;
+  document.getElementById('er-claude').value = model;
+  document.getElementById('er-provider').value = provider;
+  document.getElementById('er-target').value = targetModel;
+  document.getElementById('edit-route-modal').style.display = 'flex';
+}
+
+function closeEditRoute() {
+  document.getElementById('edit-route-modal').style.display = 'none';
+}
+
+function submitEditRoute() {
+  var origModel = document.getElementById('er-orig-model').value;
+  var newModel = document.getElementById('er-claude').value.trim();
+  var provider = document.getElementById('er-provider').value;
+  var newTarget = document.getElementById('er-target').value.trim();
+  if (!newModel || !newTarget) { toast('All fields are required', 'error'); return; }
+  // Delete old route, create new one
+  fetch(API + '/api/routes/' + encodeURIComponent(origModel), { method: 'DELETE' })
+    .then(function(r) {
+      if (!r.ok) return r.json().then(function(d) { throw new Error(d.error); });
+      return fetch(API + '/api/routes', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ model: newModel, provider: provider, target_model: newTarget, priority: 1 })
+      });
+    }).then(function(r) {
+      if (!r.ok) return r.json().then(function(d) { throw new Error(d.error); });
+      toast('Route updated');
+      closeEditRoute();
+      loadRoutes();
+    }).catch(function(e) { toast('Error: ' + e.message, 'error'); });
+}
+
+// --- Model Detail (placeholder for #3) ---
+function showModelDetail(provider, model) {
+  toast('Detail view for ' + provider + ' / ' + model + ' — coming soon', 'error');
 }
 
 function deleteRoute(model) {
@@ -458,7 +546,13 @@ function submitRoute() {
   }).catch(function(e) { toast('Error: ' + e.message, 'error'); });
 }
 
-document.addEventListener('keydown', function(e) { if (e.key === 'Escape') { closeModal(); } });
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    closeModal();
+    closeEditProvider();
+    closeEditRoute();
+  }
+});
 
 // --- Usage Stats ---
 function loadStats() {

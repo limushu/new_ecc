@@ -169,6 +169,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "ecc-domain"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "ecc-gateway"
 version = "0.1.0"
 dependencies = [

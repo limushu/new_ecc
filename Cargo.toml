@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "crates/ecc-domain",
     "crates/ecc-config",
     "crates/ecc-core",
     "crates/ecc-gateway",

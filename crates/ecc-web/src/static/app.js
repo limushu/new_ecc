@@ -163,32 +163,54 @@ function renderProviderCards() {
     addBtn.className = 'provider-card-add';
     addBtn.innerHTML = '<button class="provider-add-btn" onclick="addRouteTo(\'' + escJs(pn) + '\')">+ Add Model</button>';
 
-    var quotaDiv = document.createElement('div');
-    quotaDiv.className = 'quota-section';
-    quotaDiv.id = 'quota-' + escJs(pn);
+    // Quota or cost section based on provider type
+    var infoDiv = document.createElement('div');
+    infoDiv.className = 'quota-section';
+    infoDiv.id = 'info-' + escJs(pn);
 
     card.appendChild(head);
     card.appendChild(body);
-    card.appendChild(quotaDiv);
+    card.appendChild(infoDiv);
     card.appendChild(addBtn);
     container.appendChild(card);
   });
 
   paginateCards();
 
-  // Batch load all quotas in one request
-  loadAllQuotas();
+  // Load quota for Coding Plan providers, cost for others
+  loadProviderInfo();
 }
 
-// --- Quota ---
+// --- Provider Info (quota for Coding Plan, cost for regular API) ---
 var quotaCache = {};
+var usageCache = {};
 
-function loadAllQuotas() {
+function loadProviderInfo() {
+  // Load quota for all providers (backend handles detection)
   fetch(API + '/api/quota').then(function(r) { return r.json(); }).then(function(data) {
     quotaCache = data;
     for (var name in data) {
-      var el = document.getElementById('quota-' + name);
-      if (el) renderQuota(el, data[name]);
+      var el = document.getElementById('info-' + name);
+      if (!el) continue;
+      var prov = allProviders[name] || {};
+      if (prov.is_coding_plan) {
+        renderQuota(el, data[name]);
+      } else {
+        renderCostForProvider(el, name);
+      }
+    }
+  }).catch(function() {});
+
+  // Also load usage stats for cost calculation
+  fetch(API + '/api/usage').then(function(r) { return r.json(); }).then(function(data) {
+    usageCache = data;
+    // Render cost for non-coding-plan providers
+    for (var name in allProviders) {
+      var prov = allProviders[name];
+      if (!prov.is_coding_plan) {
+        var el = document.getElementById('info-' + name);
+        if (el) renderCostForProvider(el, name);
+      }
     }
   }).catch(function() {});
 }
@@ -244,6 +266,18 @@ function renderQuota(el, data) {
   el.innerHTML = html;
 }
 
+function renderCostForProvider(el, providerName) {
+  // Read cost from usage stats by_provider
+  var bp = usageCache.by_provider || {};
+  var provStats = bp[providerName];
+  var totalCost = (provStats && provStats.cost_usd) ? provStats.cost_usd : 0;
+  if (totalCost > 0) {
+    el.innerHTML = '<div class="cost-section"><span class="cost-label">Usage Cost</span><span class="cost-value">$' + totalCost.toFixed(4) + '</span></div>';
+  } else {
+    el.style.display = 'none';
+  }
+}
+
 function deleteProvider(name) {
   if (!confirm('Delete provider "' + name + '" and all its routes?')) return;
   fetch(API + '/api/providers/' + encodeURIComponent(name), { method: 'DELETE' })
@@ -263,6 +297,7 @@ function editProvider(name) {
   document.getElementById('ep-token').value = p.auth_token || '';
   document.getElementById('ep-protocol').value = p.protocol || 'openai';
   document.getElementById('ep-auth').value = p.auth_type || 'bearer';
+  document.getElementById('ep-coding-plan').value = String(!!p.is_coding_plan);
   document.getElementById('edit-provider-modal').style.display = 'flex';
 }
 
@@ -277,10 +312,12 @@ function submitEditProvider() {
   var token = document.getElementById('ep-token').value.trim();
   var proto = document.getElementById('ep-protocol').value;
   var auth = document.getElementById('ep-auth').value;
+  var isCodingPlan = document.getElementById('ep-coding-plan').value === 'true';
   if (url) data.base_url = url;
   if (token) data.auth_token = token;
   data.protocol = proto;
   data.auth_type = auth;
+  data.is_coding_plan = isCodingPlan;
   fetch(API + '/api/providers/' + encodeURIComponent(name), {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
@@ -503,20 +540,37 @@ function onProviderChange() {
 }
 
 // Template change: fill new-provider form fields from preset
+var currentTemplate = null;
+
 function onTemplateChange() {
   var name = document.getElementById('modal-template').value;
-  if (!name) return;
+  if (!name) { currentTemplate = null; return; }
   var tmpl = findTemplate(name);
-  if (!tmpl) return;
+  if (!tmpl) { currentTemplate = null; return; }
+  currentTemplate = tmpl;
 
   // Fill the new-provider form fields
   document.getElementById('modal-new-name').value = tmpl.name.toLowerCase();
-  document.getElementById('modal-new-url').value = tmpl.base_url;
   document.getElementById('modal-new-protocol').value = tmpl.protocol;
+  // Use protocol-aware URL
+  updateTemplateUrl();
   document.getElementById('modal-new-auth').value = tmpl.auth_type;
 
   // Populate target model dropdown from template
   populateTargetModels(tmpl, null);
+}
+
+// Update base URL when protocol changes, using alt_base_urls from template
+function onNewProtocolChange() {
+  updateTemplateUrl();
+}
+
+function updateTemplateUrl() {
+  if (!currentTemplate) return;
+  var proto = document.getElementById('modal-new-protocol').value;
+  var alt = currentTemplate.alt_base_urls || {};
+  var url = alt[proto] || currentTemplate.base_url;
+  document.getElementById('modal-new-url').value = url;
 }
 
 function populateClaudeModels(tmpl) {
@@ -573,6 +627,7 @@ function submitRoute() {
     var newToken = document.getElementById('modal-new-token').value.trim();
     var newProto = document.getElementById('modal-new-protocol').value;
     var newAuth = document.getElementById('modal-new-auth').value;
+    var isCodingPlan = document.getElementById('modal-new-coding-plan').value === 'true';
     if (!newName || !newUrl || !newToken) {
       toast('Provider name, Base URL, and Auth Token are required', 'error');
       return;
@@ -585,7 +640,7 @@ function submitRoute() {
     fetch(API + '/api/providers', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name: newName, base_url: newUrl, auth_token: newToken, protocol: newProto, auth_type: newAuth })
+      body: JSON.stringify({ name: newName, base_url: newUrl, auth_token: newToken, protocol: newProto, auth_type: newAuth, is_coding_plan: isCodingPlan })
     }).then(function(r) {
       if (!r.ok) return r.json().then(function(d) { throw new Error(d.error); });
       // Now create route

@@ -71,6 +71,7 @@ fn make_pipeline(mock_port: u16) -> (Arc<Pipeline>, Arc<RwLock<ProviderTable>>) 
         auth_token: "sk-mock".to_string(),
         auth_type: AuthType::Bearer,
         protocol: Protocol::OpenAI,
+        is_coding_plan: false,
     });
     let provider_table = Arc::new(RwLock::new(ProviderTable { providers }));
 
@@ -135,12 +136,14 @@ async fn t64_failover_e2e() {
         auth_token: "sk".to_string(),
         auth_type: AuthType::Bearer,
         protocol: Protocol::OpenAI,
+        is_coding_plan: false,
     });
     providers.insert("backup".to_string(), Provider {
         base_url: format!("http://127.0.0.1:{ok_port}"),
         auth_token: "sk".to_string(),
         auth_type: AuthType::Bearer,
         protocol: Protocol::OpenAI,
+        is_coding_plan: false,
     });
     let provider_table = Arc::new(RwLock::new(ProviderTable { providers }));
 

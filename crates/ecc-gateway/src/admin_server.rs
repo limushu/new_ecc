@@ -206,6 +206,8 @@ impl AdminServer {
             auth_type: ecc_config::provider::AuthType,
             #[serde(default)]
             protocol: ecc_config::provider::Protocol,
+            #[serde(default)]
+            is_coding_plan: bool,
         }
 
         let input: CreateProvider = match serde_json::from_slice(&body) {
@@ -225,6 +227,7 @@ impl AdminServer {
                 auth_token: input.auth_token,
                 auth_type: input.auth_type,
                 protocol: input.protocol,
+                is_coding_plan: input.is_coding_plan,
             },
         );
 
@@ -253,6 +256,8 @@ impl AdminServer {
             auth_type: Option<ecc_config::provider::AuthType>,
             #[serde(default)]
             protocol: Option<ecc_config::provider::Protocol>,
+            #[serde(default)]
+            is_coding_plan: Option<bool>,
         }
 
         let input: UpdateProvider = match serde_json::from_slice(&body) {
@@ -269,6 +274,7 @@ impl AdminServer {
         if let Some(v) = input.auth_token { provider.auth_token = v; }
         if let Some(v) = input.auth_type { provider.auth_type = v; }
         if let Some(v) = input.protocol { provider.protocol = v; }
+        if let Some(v) = input.is_coding_plan { provider.is_coding_plan = v; }
 
         if let Err(e) = ecc_config::provider::save_providers(&self.providers_path, &table) {
             ecc_error!(ADM_SAVE_ERROR, "Failed to save providers: {e}");
@@ -784,6 +790,7 @@ mod tests {
                 auth_token: "sk-test-123".to_string(),
                 auth_type: ecc_config::provider::AuthType::Bearer,
                 protocol: ecc_config::provider::Protocol::OpenAI,
+                is_coding_plan: false,
             },
         );
         ecc_config::provider::save_providers(&dir.path().join("providers.toml"), &table).unwrap();
@@ -813,6 +820,7 @@ mod tests {
                 auth_token: "sk-test".to_string(),
                 auth_type: ecc_config::provider::AuthType::Bearer,
                 protocol: ecc_config::provider::Protocol::OpenAI,
+                is_coding_plan: false,
             },
         );
         *admin.providers.write().await = ptable;

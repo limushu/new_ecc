@@ -143,6 +143,7 @@ mod tests {
                 auth_token: "sk-test-123".to_string(),
                 auth_type: ecc_config::provider::AuthType::Bearer,
                 protocol: ecc_config::provider::Protocol::OpenAI,
+                is_coding_plan: false,
             },
         );
         providers.insert(
@@ -152,6 +153,7 @@ mod tests {
                 auth_token: "mk-test-456".to_string(),
                 auth_type: ecc_config::provider::AuthType::Bearer,
                 protocol: ecc_config::provider::Protocol::Anthropic,
+                is_coding_plan: false,
             },
         );
         ecc_config::provider::ProviderTable { providers }
@@ -189,6 +191,7 @@ mod tests {
                 auth_token: "sk-test".to_string(),
                 auth_type: ecc_config::provider::AuthType::Bearer,
                 protocol: ecc_config::provider::Protocol::OpenAI,
+                is_coding_plan: false,
             },
         );
         let providers = Arc::new(RwLock::new(ecc_config::provider::ProviderTable { providers }));

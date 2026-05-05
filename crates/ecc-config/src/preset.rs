@@ -23,6 +23,12 @@ pub struct SuggestedMapping {
 pub struct Preset {
     pub name: String,
     pub base_url: String,
+    /// Alternative base URLs keyed by protocol name ("openai", "anthropic").
+    /// When a template is selected and the user switches protocol, the matching
+    /// URL here overrides `base_url`. E.g. DeepSeek uses different URLs for
+    /// OpenAI vs Anthropic protocol.
+    #[serde(default)]
+    pub alt_base_urls: HashMap<String, String>,
     #[serde(default)]
     pub protocol: Protocol,
     #[serde(default)]
@@ -51,22 +57,30 @@ pub fn list_builtin_presets() -> Vec<Preset> {
 
     // ── DeepSeek ──
     let mut ds_pricing = HashMap::new();
+    ds_pricing.insert("deepseek-v4-flash".to_string(), Pricing { input_per_m: 0.28, output_per_m: 0.42, cache_read_per_m: Some(0.028) });
+    ds_pricing.insert("deepseek-v4-pro".to_string(), Pricing { input_per_m: 0.55, output_per_m: 2.19, cache_read_per_m: Some(0.138) });
     ds_pricing.insert("deepseek-chat".to_string(), Pricing { input_per_m: 0.28, output_per_m: 0.42, cache_read_per_m: Some(0.028) });
     ds_pricing.insert("deepseek-reasoner".to_string(), Pricing { input_per_m: 0.55, output_per_m: 2.19, cache_read_per_m: Some(0.138) });
+    let mut ds_alt_urls = HashMap::new();
+    ds_alt_urls.insert("openai".to_string(), "https://api.deepseek.com".to_string());
+    ds_alt_urls.insert("anthropic".to_string(), "https://api.deepseek.com/anthropic".to_string());
     presets.push(Preset {
         name: "DeepSeek".to_string(),
         base_url: "https://api.deepseek.com".to_string(),
+        alt_base_urls: ds_alt_urls,
         protocol: Protocol::OpenAI,
         auth_type: AuthType::Bearer,
         models: vec![
-            ModelInfo { id: "deepseek-chat".to_string(), name: "DeepSeek V3".to_string() },
-            ModelInfo { id: "deepseek-reasoner".to_string(), name: "DeepSeek R1".to_string() },
+            ModelInfo { id: "deepseek-v4-flash".to_string(), name: "DeepSeek V4 Flash".to_string() },
+            ModelInfo { id: "deepseek-v4-pro".to_string(), name: "DeepSeek V4 Pro".to_string() },
+            ModelInfo { id: "deepseek-chat".to_string(), name: "DeepSeek Chat (legacy)".to_string() },
+            ModelInfo { id: "deepseek-reasoner".to_string(), name: "DeepSeek Reasoner (legacy)".to_string() },
         ],
         pricing: ds_pricing,
         suggested_mappings: vec![
-            SuggestedMapping { claude_model: "claude-sonnet-4-6".into(), provider_models: vec!["deepseek-chat".into()] },
-            SuggestedMapping { claude_model: "claude-opus-4-7".into(), provider_models: vec!["deepseek-reasoner".into(), "deepseek-chat".into()] },
-            SuggestedMapping { claude_model: "claude-haiku-4-5".into(), provider_models: vec!["deepseek-chat".into()] },
+            SuggestedMapping { claude_model: "claude-sonnet-4-6".into(), provider_models: vec!["deepseek-v4-flash".into()] },
+            SuggestedMapping { claude_model: "claude-opus-4-7".into(), provider_models: vec!["deepseek-v4-pro".into(), "deepseek-v4-flash".into()] },
+            SuggestedMapping { claude_model: "claude-haiku-4-5".into(), provider_models: vec!["deepseek-v4-flash".into()] },
         ],
     });
 
@@ -76,10 +90,11 @@ pub fn list_builtin_presets() -> Vec<Preset> {
     presets.push(Preset {
         name: "Kimi".to_string(),
         base_url: "https://api.kimi.com/coding/".to_string(),
+        alt_base_urls: HashMap::new(),
         protocol: Protocol::Anthropic,
         auth_type: AuthType::Bearer,
         models: vec![
-            ModelInfo { id: "kimi-for-coding".to_string(), name: "Kimi Code".to_string() },
+            ModelInfo { id: "kimi-for-coding".to_string(), name: "Kimi Code (K2.6)".to_string() },
         ],
         pricing: kimi_pricing,
         suggested_mappings: vec![
@@ -94,9 +109,13 @@ pub fn list_builtin_presets() -> Vec<Preset> {
     glm_pricing.insert("glm-5-turbo".to_string(), Pricing { input_per_m: 0.70, output_per_m: 3.10, cache_read_per_m: None });
     glm_pricing.insert("glm-4.6".to_string(), Pricing { input_per_m: 0.70, output_per_m: 3.10, cache_read_per_m: None });
     glm_pricing.insert("glm-4-flash".to_string(), Pricing { input_per_m: 0.0, output_per_m: 0.0, cache_read_per_m: None });
+    let mut glm_alt_urls = HashMap::new();
+    glm_alt_urls.insert("openai".to_string(), "https://open.bigmodel.cn/api/paas/v4".to_string());
+    glm_alt_urls.insert("anthropic".to_string(), "https://open.bigmodel.cn/api/anthropic".to_string());
     presets.push(Preset {
         name: "GLM".to_string(),
         base_url: "https://open.bigmodel.cn/api/anthropic".to_string(),
+        alt_base_urls: glm_alt_urls,
         protocol: Protocol::Anthropic,
         auth_type: AuthType::Bearer,
         models: vec![
@@ -205,6 +224,7 @@ mod tests {
         let custom = Preset {
             name: "DeepSeek".to_string(),
             base_url: "https://custom.deepseek.proxy".to_string(),
+            alt_base_urls: HashMap::new(),
             protocol: Protocol::OpenAI,
             auth_type: AuthType::Bearer,
             models: vec![ModelInfo { id: "deepseek-chat".to_string(), name: "Custom DS".to_string() }],
@@ -227,6 +247,7 @@ mod tests {
         let custom = Preset {
             name: "MyProvider".to_string(),
             base_url: "https://my.provider.com".to_string(),
+            alt_base_urls: HashMap::new(),
             protocol: Protocol::Anthropic,
             auth_type: AuthType::Bearer,
             models: vec![],

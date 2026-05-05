@@ -176,7 +176,7 @@
       <div class="form-row">
         <div>
           <label>Protocol</label>
-          <select id="modal-new-protocol">
+          <select id="modal-new-protocol" onchange="onNewProtocolChange()">
             <option value="openai">OpenAI</option>
             <option value="anthropic">Anthropic</option>
           </select>
@@ -188,6 +188,13 @@
             <option value="api_key">API Key</option>
           </select>
         </div>
+      </div>
+      <div class="form-group">
+        <label>Plan Type</label>
+        <select id="modal-new-coding-plan">
+          <option value="false">Regular API (pay-per-use)</option>
+          <option value="true">Coding Plan (quota-based)</option>
+        </select>
       </div>
     </div>
 
@@ -248,6 +255,13 @@
           <option value="api_key">API Key</option>
         </select>
       </div>
+    </div>
+    <div class="form-group">
+      <label>Plan Type</label>
+      <select id="ep-coding-plan">
+        <option value="false">Regular API (pay-per-use)</option>
+        <option value="true">Coding Plan (quota-based)</option>
+      </select>
     </div>
     <div style="display:flex;gap:12px;margin-top:24px;">
       <button class="btn btn-primary" onclick="submitEditProvider()">Save</button>

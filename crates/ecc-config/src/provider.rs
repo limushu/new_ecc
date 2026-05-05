@@ -56,6 +56,8 @@ pub struct Provider {
     pub auth_type: AuthType,
     #[serde(default)]
     pub protocol: Protocol,
+    #[serde(default)]
+    pub is_coding_plan: bool,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -138,6 +140,7 @@ protocol = "openai"
                 auth_token: "tok".to_string(),
                 auth_type: AuthType::Bearer,
                 protocol: Protocol::Anthropic,
+                is_coding_plan: false,
             },
         );
         let serialized = toml::to_string_pretty(&table).unwrap();
@@ -158,6 +161,7 @@ protocol = "openai"
                 auth_token: "t1".to_string(),
                 auth_type: AuthType::Bearer,
                 protocol: Protocol::Anthropic,
+                is_coding_plan: false,
             },
         );
         save_providers(&path, &table).unwrap();
@@ -170,6 +174,7 @@ protocol = "openai"
                 auth_token: "t2".to_string(),
                 auth_type: AuthType::ApiKey,
                 protocol: Protocol::OpenAI,
+                is_coding_plan: false,
             },
         );
         save_providers(&path, &table2).unwrap();

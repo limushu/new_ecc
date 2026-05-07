@@ -1,11 +1,6 @@
 [workspace]
 members = [
-    "crates/ecc-domain",
-    "crates/ecc-config",
-    "crates/ecc-core",
-    "crates/ecc-gateway",
     "crates/ecc-web",
-    ".",
 ]
 resolver = "2"
 
@@ -25,33 +20,6 @@ chrono = { version = "0.4", features = ["serde"] }
 http = "1"
 bytes = "1"
 thiserror = "2"
-
-[package]
-name = "ecc"
-version = "2.0.0"
-edition = "2021"
-description = "Lightweight local reverse proxy for Claude Code multi-provider switching"
-
-[dependencies]
-ecc-gateway = { path = "crates/ecc-gateway" }
-ecc-core = { path = "crates/ecc-core" }
-ecc-config = { path = "crates/ecc-config" }
-tokio = { workspace = true }
-tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
-hyper = { workspace = true }
-hyper-util = { workspace = true }
-http-body-util = { workspace = true }
-serde_json = { workspace = true }
-
-[dev-dependencies]
-tempfile = "3"
-bytes = { workspace = true }
-http = { workspace = true }
-reqwest = { workspace = true }
-ecc-core = { path = "crates/ecc-core" }
-ecc-config = { path = "crates/ecc-config" }
-ecc-gateway = { path = "crates/ecc-gateway" }
 
 [profile.release]
 opt-level = "s"

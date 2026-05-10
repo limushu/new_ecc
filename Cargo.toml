@@ -1,7 +1,9 @@
 [workspace]
 members = [
     "crates/ecc-domain",
+    "crates/ecc-engine",
     "crates/ecc-infra",
+    "crates/ecc-app",
     "crates/ecc-web",
 ]
 resolver = "2"

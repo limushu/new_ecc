@@ -7,6 +7,7 @@ use ecc_app::quota_service::QuotaService;
 use ecc_app::usage_service::UsageService;
 use ecc_app::PlaygroundService;
 use ecc_engine::circuit_breaker::CircuitBreaker;
+use ecc_engine::converter::ConverterMiddleware;
 use ecc_engine::forwarder::Forwarder;
 use ecc_engine::middleware::Pipeline;
 use ecc_engine::rectifier::ThinkingRectifier;
@@ -57,10 +58,8 @@ async fn async_main() {
 
     // DB seed
     let seed_count =
-        ecc_infra::seed::seed_if_empty(&*preset_repo).expect("failed to seed presets");
-    if seed_count > 0 {
-        tracing::info!("seeded {seed_count} presets");
-    }
+        ecc_infra::seed::sync_presets(&*preset_repo).expect("failed to sync presets");
+    tracing::info!("synced {seed_count} presets");
 
     // Build route table
     route_repo.rebuild().expect("failed to build routes");
@@ -84,6 +83,7 @@ async fn async_main() {
         Pipeline::new()
             .with_max_retries(2)
             .add(Arc::new(Router::new(route_repo.clone())))
+            .add(Arc::new(ConverterMiddleware::new()))
             .add(Arc::new(ThinkingRectifier::new()))
             .add(Arc::new(CircuitBreaker::new(CircuitBreakerConfig {
                 failure_threshold: 5,
@@ -94,6 +94,10 @@ async fn async_main() {
     );
 
     let proxy_server = ProxyServer::new(pipeline);
+
+    quota_service.spawn(reqwest_client.clone(), provider_repo.clone()).await;
+    tracing::info!("quota cache initialized");
+
     let admin_server = Arc::new(AdminServer::new(
         provider_service,
         preset_service,

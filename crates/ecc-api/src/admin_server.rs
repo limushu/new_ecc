@@ -5,7 +5,6 @@ use bytes::Bytes;
 use http_body_util::{BodyExt, Full};
 use hyper::body::Incoming;
 use hyper::{Request, Response};
-use tokio::sync::RwLock;
 
 use ecc_app::provider_service::{CreateProviderCommand, ProviderService, UpdateProviderCommand};
 use ecc_app::preset_service::PresetService;
@@ -14,7 +13,7 @@ use ecc_app::usage_service::UsageService;
 use ecc_app::PlaygroundService;
 use ecc_app::{PlaygroundRequest, PlaygroundResponse};
 use ecc_domain::repository::{
-    ConfigRepository, PresetRepository, ProviderRepository, QuotaInfo, RouteRepository,
+    ConfigRepository, PresetRepository, ProviderRepository, RouteRepository,
     UsageRepository,
 };
 
@@ -31,10 +30,8 @@ where
     provider_service: Arc<ProviderService<P, C, R>>,
     preset_service: Arc<PresetService<PR>>,
     usage_service: Arc<UsageService<U>>,
-    #[allow(dead_code)]
     quota_service: Arc<QuotaService>,
     playground_service: Arc<PlaygroundService>,
-    quota_cache: Arc<RwLock<HashMap<String, QuotaInfo>>>,
     client: reqwest::Client,
 }
 
@@ -60,7 +57,6 @@ where
             usage_service,
             quota_service,
             playground_service,
-            quota_cache: Arc::new(RwLock::new(HashMap::new())),
             client,
         }
     }
@@ -154,13 +150,12 @@ where
 
             // Quota (from cache)
             Route::QueryAllQuotas => {
-                let cache = self.quota_cache.read().await;
-                json_ok(&*cache)
+                let data = self.quota_service.get_all().await;
+                json_ok(&data)
             }
             Route::QueryQuota(name) => {
-                let cache = self.quota_cache.read().await;
-                match cache.get(&name) {
-                    Some(info) => json_ok(info),
+                match self.quota_service.get(&name).await {
+                    Some(info) => json_ok(&info),
                     None => json_error(404, &format!("quota for '{name}' not cached")),
                 }
             }

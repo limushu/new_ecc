@@ -71,7 +71,31 @@
     "suggested_mappings": [
       { "claude_model": "claude-sonnet-4-6", "provider_model": "glm-5-fp8" }
     ],
-    "quota_adapter": null
+    "quota_adapter": {
+      "quota_api_url": "https://open.bigmodel.cn/api/monitor/usage/quota/limit",
+      "auth_style": "raw",
+      "extra_headers": {},
+      "response_mapping": {
+        "error_check": { "field": "success", "value": true },
+        "tiers": [
+          {
+            "name": "mcp_monthly",
+            "percentage_path": "data.limits[0].percentage",
+            "resets_at_path": "data.limits[0].nextResetTime"
+          },
+          {
+            "name": "five_hour",
+            "percentage_path": "data.limits[1].percentage",
+            "resets_at_path": "data.limits[1].nextResetTime"
+          },
+          {
+            "name": "weekly_limit",
+            "percentage_path": "data.limits[2].percentage",
+            "resets_at_path": "data.limits[2].nextResetTime"
+          }
+        ]
+      }
+    }
   },
   {
     "name": "MiniMax",

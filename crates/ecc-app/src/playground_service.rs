@@ -1,6 +1,23 @@
 use bytes::Bytes;
 use ecc_domain::provider::{AuthType, Protocol, Provider};
 
+#[derive(serde::Deserialize)]
+pub struct PlaygroundRequest {
+    pub provider: String,
+    pub model: String,
+    pub message: String,
+}
+
+#[derive(serde::Serialize)]
+pub struct PlaygroundResponse {
+    pub status: u16,
+    pub body: String,
+    pub latency_ms: u64,
+    pub input_tokens: u64,
+    pub output_tokens: u64,
+    pub cache_read_tokens: u64,
+}
+
 pub struct PlaygroundResult {
     pub status: u16,
     pub body: Bytes,
@@ -17,7 +34,24 @@ impl PlaygroundService {
         Self
     }
 
-    pub async fn test(
+    /// Test connectivity by provider name.
+    pub async fn test_by_name(
+        &self,
+        client: &reqwest::Client,
+        provider_repo: &dyn ecc_domain::repository::ProviderRepository,
+        provider_name: &str,
+        model: &str,
+        message: &str,
+    ) -> Result<PlaygroundResult, ecc_domain::repository::RepositoryError> {
+        let provider = provider_repo
+            .get(provider_name)?
+            .ok_or_else(|| ecc_domain::repository::RepositoryError::NotFound(format!(
+                "provider '{provider_name}' not found"
+            )))?;
+        Ok(self.test(client, &provider, model, message).await)
+    }
+
+    async fn test(
         &self,
         client: &reqwest::Client,
         provider: &Provider,

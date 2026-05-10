@@ -81,7 +81,7 @@ impl PresetRepository for PresetRepo {
         for preset in presets {
             let json = serde_json::to_string(preset).map_err(store::db_err)?;
             conn.execute(
-                "INSERT OR IGNORE INTO presets (name, data) VALUES (?1, ?2)",
+                "INSERT OR REPLACE INTO presets (name, data) VALUES (?1, ?2)",
                 params![preset.name, json],
             )
             .map_err(store::db_err)?;

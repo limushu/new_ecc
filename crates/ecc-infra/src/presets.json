@@ -1,0 +1,114 @@
+[
+  {
+    "name": "DeepSeek",
+    "base_url": "https://api.deepseek.com",
+    "alt_base_urls": {},
+    "protocol": "openai",
+    "auth_type": "bearer",
+    "models": [
+      { "id": "deepseek-chat", "display_name": "DeepSeek-V3" },
+      { "id": "deepseek-chat-latest", "display_name": "DeepSeek-V4 Flash" }
+    ],
+    "pricing": {
+      "deepseek-chat": { "input_per_m": 0.27, "output_per_m": 1.10, "cache_read_per_m": 0.027 },
+      "deepseek-chat-latest": { "input_per_m": 0.14, "output_per_m": 0.28, "cache_read_per_m": 0.014 }
+    },
+    "suggested_mappings": [
+      { "claude_model": "claude-sonnet-4-6", "provider_model": "deepseek-chat-latest" },
+      { "claude_model": "claude-haiku-4-5", "provider_model": "deepseek-chat" }
+    ],
+    "quota_adapter": null
+  },
+  {
+    "name": "Kimi",
+    "base_url": "https://api.kimi.com/coding",
+    "alt_base_urls": { "anthropic": "https://api.kimi.com/coding/anthropic" },
+    "protocol": "anthropic",
+    "auth_type": "bearer",
+    "models": [
+      { "id": "kimi-for-coding", "display_name": "Kimi K2.6" }
+    ],
+    "pricing": {
+      "kimi-for-coding": { "input_per_m": 0.00, "output_per_m": 0.00 }
+    },
+    "suggested_mappings": [
+      { "claude_model": "claude-sonnet-4-6", "provider_model": "kimi-for-coding" }
+    ],
+    "quota_adapter": {
+      "quota_api_url": "https://api.kimi.com/coding/v1/usages",
+      "auth_style": "bearer",
+      "extra_headers": { "Accept": "application/json" },
+      "response_mapping": {
+        "tiers": [
+          {
+            "name": "five_hour",
+            "limit_path": "limits[0].detail.limit",
+            "remaining_path": "limits[0].detail.remaining",
+            "resets_at_path": "limits[0].detail.resetTime"
+          },
+          {
+            "name": "weekly_limit",
+            "limit_path": "usage.limit",
+            "remaining_path": "usage.remaining",
+            "resets_at_path": "usage.resetTime"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "GLM",
+    "base_url": "https://open.bigmodel.cn/api/anthropic",
+    "alt_base_urls": {},
+    "protocol": "anthropic",
+    "auth_type": "api_key",
+    "models": [
+      { "id": "glm-5-fp8", "display_name": "GLM-5 FP8" }
+    ],
+    "pricing": {
+      "glm-5-fp8": { "input_per_m": 0.00, "output_per_m": 0.00 }
+    },
+    "suggested_mappings": [
+      { "claude_model": "claude-sonnet-4-6", "provider_model": "glm-5-fp8" }
+    ],
+    "quota_adapter": null
+  },
+  {
+    "name": "MiniMax",
+    "base_url": "https://api.minimax.io/v1",
+    "alt_base_urls": {},
+    "protocol": "openai",
+    "auth_type": "bearer",
+    "models": [
+      { "id": "m2.5-coding", "display_name": "MiniMax M2.5 Coding" }
+    ],
+    "pricing": {
+      "m2.5-coding": { "input_per_m": 0.00, "output_per_m": 0.00 }
+    },
+    "suggested_mappings": [
+      { "claude_model": "claude-sonnet-4-6", "provider_model": "m2.5-coding" }
+    ],
+    "quota_adapter": {
+      "quota_api_url": "https://api.minimax.io/v1/api/openplatform/coding_plan/remains",
+      "auth_style": "bearer",
+      "extra_headers": { "Content-Type": "application/json" },
+      "response_mapping": {
+        "error_check": { "field": "base_resp.status_code", "value": 0, "not_equal": true },
+        "tiers": [
+          {
+            "name": "five_hour",
+            "total_path": "model_remains[0].current_interval_total_count",
+            "used_path": "model_remains[0].current_interval_usage_count",
+            "resets_at_path": "model_remains[0].end_time"
+          },
+          {
+            "name": "weekly_limit",
+            "total_path": "model_remains[0].current_weekly_total_count",
+            "used_path": "model_remains[0].current_weekly_usage_count",
+            "resets_at_path": "model_remains[0].weekly_end_time"
+          }
+        ]
+      }
+    }
+  }
+]

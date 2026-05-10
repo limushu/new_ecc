@@ -1,0 +1,20 @@
+[package]
+name = "ecc-engine"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ecc-domain = { path = "../ecc-domain" }
+tokio = { workspace = true }
+reqwest = { workspace = true }
+hyper = { workspace = true }
+http = { workspace = true }
+http-body-util = { workspace = true }
+bytes = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+chrono = { workspace = true }
+futures-util = "0.3"

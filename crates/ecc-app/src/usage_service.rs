@@ -1,12 +1,14 @@
+use std::sync::Arc;
+
 use chrono::{DateTime, Utc};
 use ecc_domain::repository::{ProviderUsage, RepositoryError, UsageRecord, UsageRepository};
 
 pub struct UsageService<U: UsageRepository> {
-    usage_repo: U,
+    usage_repo: Arc<U>,
 }
 
 impl<U: UsageRepository> UsageService<U> {
-    pub fn new(usage_repo: U) -> Self {
+    pub fn new(usage_repo: Arc<U>) -> Self {
         Self { usage_repo }
     }
 

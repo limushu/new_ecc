@@ -1,12 +1,14 @@
+use std::sync::Arc;
+
 use ecc_domain::preset::Preset;
 use ecc_domain::repository::{PresetRepository, RepositoryError};
 
 pub struct PresetService<R: PresetRepository> {
-    repo: R,
+    repo: Arc<R>,
 }
 
 impl<R: PresetRepository> PresetService<R> {
-    pub fn new(repo: R) -> Self {
+    pub fn new(repo: Arc<R>) -> Self {
         Self { repo }
     }
 

@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use ecc_domain::mapping::RouteTarget;
+use ecc_domain::provider::Provider;
 use ecc_domain::repository::{ProviderRepository, RouteRepository, RepositoryError};
 
 use crate::cache::RouteCache;
@@ -52,5 +53,23 @@ impl RouteRepository for RouteRepo {
         }
         self.cache.clear_and_fill(route_map);
         Ok(())
+    }
+}
+
+impl ProviderRepository for RouteRepo {
+    fn list(&self) -> Result<Vec<Provider>, RepositoryError> {
+        self.provider_repo.list()
+    }
+
+    fn get(&self, name: &str) -> Result<Option<Provider>, RepositoryError> {
+        self.provider_repo.get(name)
+    }
+
+    fn save(&self, provider: &Provider) -> Result<(), RepositoryError> {
+        self.provider_repo.save(provider)
+    }
+
+    fn delete(&self, name: &str) -> Result<(), RepositoryError> {
+        self.provider_repo.delete(name)
     }
 }

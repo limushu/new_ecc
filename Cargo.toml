@@ -4,9 +4,34 @@ members = [
     "crates/ecc-engine",
     "crates/ecc-infra",
     "crates/ecc-app",
+    "crates/ecc-api",
     "crates/ecc-web",
+    ".",
 ]
+
 resolver = "2"
+
+[package]
+name = "ecc"
+version = "0.2.0"
+edition = "2021"
+
+[[bin]]
+name = "ecc"
+path = "src/main.rs"
+
+[dependencies]
+ecc-domain = { path = "crates/ecc-domain" }
+ecc-engine = { path = "crates/ecc-engine" }
+ecc-infra = { path = "crates/ecc-infra" }
+ecc-app = { path = "crates/ecc-app" }
+ecc-api = { path = "crates/ecc-api" }
+tokio = { workspace = true }
+hyper = { workspace = true }
+hyper-util = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+reqwest = { workspace = true }
 
 [workspace.dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "io-util"] }

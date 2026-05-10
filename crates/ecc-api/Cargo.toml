@@ -1,0 +1,24 @@
+[package]
+name = "ecc-api"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ecc-domain = { path = "../ecc-domain" }
+ecc-app = { path = "../ecc-app" }
+ecc-engine = { path = "../ecc-engine" }
+ecc-infra = { path = "../ecc-infra" }
+ecc-web = { path = "../ecc-web" }
+tokio = { workspace = true }
+hyper = { workspace = true }
+hyper-util = { workspace = true }
+http-body-util = { workspace = true }
+http = { workspace = true }
+bytes = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+chrono = { workspace = true }
+reqwest = { workspace = true }

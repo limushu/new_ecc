@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use ecc_domain::mapping::ModelMapping;
 use ecc_domain::preset::QuotaAdapter;
@@ -8,6 +9,7 @@ use ecc_domain::repository::{
     ConfigRepository, ProviderRepository, RepositoryError, RouteRepository,
 };
 
+#[derive(serde::Deserialize)]
 pub struct CreateProviderCommand {
     pub name: String,
     pub base_url: String,
@@ -20,6 +22,7 @@ pub struct CreateProviderCommand {
     pub quota_adapter: Option<QuotaAdapter>,
 }
 
+#[derive(serde::Deserialize)]
 pub struct UpdateProviderCommand {
     pub base_url: Option<String>,
     pub auth_token: Option<String>,
@@ -37,9 +40,9 @@ where
     C: ConfigRepository,
     R: RouteRepository,
 {
-    provider_repo: P,
-    config_repo: C,
-    route_repo: R,
+    provider_repo: Arc<P>,
+    config_repo: Arc<C>,
+    route_repo: Arc<R>,
 }
 
 impl<P, C, R> ProviderService<P, C, R>
@@ -48,8 +51,12 @@ where
     C: ConfigRepository,
     R: RouteRepository,
 {
-    pub fn new(provider_repo: P, config_repo: C, route_repo: R) -> Self {
+    pub fn new(provider_repo: Arc<P>, config_repo: Arc<C>, route_repo: Arc<R>) -> Self {
         Self { provider_repo, config_repo, route_repo }
+    }
+
+    pub fn provider_repo(&self) -> &P {
+        &self.provider_repo
     }
 
     pub fn list_providers(&self) -> Result<Vec<Provider>, RepositoryError> {

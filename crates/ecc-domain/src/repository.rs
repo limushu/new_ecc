@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::mapping::RouteTarget;
@@ -56,7 +57,7 @@ pub trait UsageRepository: Send + Sync {
     ) -> Result<Vec<ProviderUsage>, RepositoryError>;
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UsageRecord {
     pub id: String,
     pub timestamp: DateTime<Utc>,
@@ -71,7 +72,7 @@ pub struct UsageRecord {
     pub status: u16,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProviderUsage {
     pub provider_name: String,
     pub total_requests: u64,
@@ -81,7 +82,7 @@ pub struct ProviderUsage {
     pub total_cost_usd: f64,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QuotaInfo {
     pub provider_name: String,
     pub success: bool,
@@ -89,7 +90,7 @@ pub struct QuotaInfo {
     pub error: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QuotaTier {
     pub name: String,
     pub utilization: f64,

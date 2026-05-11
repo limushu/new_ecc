@@ -510,24 +510,213 @@ function buildBar(usageData) {
   });
 }
 
+// --- Timeline ---
+var timelineChart = null;
+var timelineGran = 'day';
+var timelineDrillProvider = null;
+
+function onGranChange() {
+  timelineGran = document.getElementById('gran-select').value;
+  buildTimeline();
+}
+
+function timelineGoBack() {
+  timelineDrillProvider = null;
+  document.getElementById('timeline-back').style.display = 'none';
+  document.getElementById('timeline-title').textContent = 'Usage Timeline';
+  buildTimeline();
+}
+
+function generateBuckets(gran) {
+  var now = new Date();
+  var keys = [], labels = [];
+  var i, d, Y, M, D, h, prevMonth;
+
+  if (gran === 'hour') {
+    for (i = 23; i >= 0; i--) {
+      d = new Date(now.getTime() - i * 3600000);
+      Y = d.getFullYear(); M = pad2(d.getMonth() + 1); D = pad2(d.getDate()); h = pad2(d.getHours());
+      keys.push(Y + '-' + M + '-' + D + ' ' + h + ':00');
+      labels.push(h + ':00');
+    }
+  } else if (gran === 'day') {
+    for (i = 29; i >= 0; i--) {
+      d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+      Y = d.getFullYear(); M = pad2(d.getMonth() + 1); D = pad2(d.getDate());
+      keys.push(Y + '-' + M + '-' + D);
+      labels.push(M + '-' + D);
+    }
+  } else if (gran === 'week') {
+    var dow = now.getDay();
+    var mon = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (dow === 0 ? 6 : dow - 1));
+    for (i = 11; i >= 0; i--) {
+      d = new Date(mon.getTime() - i * 7 * 86400000);
+      Y = d.getFullYear(); M = pad2(d.getMonth() + 1); D = pad2(d.getDate());
+      keys.push(Y + '-W' + M + D);
+      labels.push(M + '-' + D);
+    }
+  } else {
+    for (i = 11; i >= 0; i--) {
+      d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      Y = d.getFullYear(); M = pad2(d.getMonth() + 1);
+      keys.push(Y + '-' + M);
+      labels.push(Y + '-' + M);
+    }
+  }
+
+  return { keys: keys, labels: labels };
+}
+
+function pad2(n) { return ('0' + n).slice(-2); }
+
+function recordBucketKey(ts, gran) {
+  var d = new Date(ts);
+  var Y = d.getFullYear(), M = pad2(d.getMonth() + 1), D = pad2(d.getDate()), h = pad2(d.getHours());
+  if (gran === 'hour') return Y + '-' + M + '-' + D + ' ' + h + ':00';
+  if (gran === 'week') return Y + '-W' + pad2(d.getMonth() + 1) + pad2(d.getDate());
+  if (gran === 'month') return Y + '-' + M;
+  return Y + '-' + M + '-' + D;
+}
+
+function buildTimeline() {
+  if (timelineChart) { timelineChart.destroy(); timelineChart = null; }
+
+  var fetchDays = { hour: 1, day: 30, week: 90, month: 365 }[timelineGran] || 30;
+  var url = API + '/api/usage/detail?days=' + fetchDays;
+  if (timelineDrillProvider) {
+    url += '&provider=' + encodeURIComponent(timelineDrillProvider);
+  }
+
+  fetch(url)
+    .then(function(r) { return r.json(); })
+    .then(function(records) {
+      var arr = Array.isArray(records) ? records : [];
+      var b = generateBuckets(timelineGran);
+      var groupField = timelineDrillProvider ? 'target_model' : 'provider_name';
+
+      var agg = {};
+      var groupSet = {};
+      arr.forEach(function(r) {
+        var gval = r[groupField] || 'unknown';
+        var bk = recordBucketKey(r.timestamp, timelineGran);
+        agg[gval + '||' + bk] = (agg[gval + '||' + bk] || 0) + (r.input_tokens || 0) + (r.output_tokens || 0);
+        groupSet[gval] = true;
+      });
+
+      var groupNames = Object.keys(groupSet).sort();
+
+      var datasets = groupNames.map(function(name, i) {
+        var color = LINE_COLORS[i % LINE_COLORS.length];
+        return {
+          label: name,
+          data: b.keys.map(function(bk) { return agg[name + '||' + bk] || 0; }),
+          borderColor: color,
+          backgroundColor: color + '18',
+          fill: false, tension: 0.1, pointRadius: 2, pointHoverRadius: 5, borderWidth: 2,
+          spanGaps: false
+        };
+      });
+
+      var ctx = document.getElementById('timelineChart').getContext('2d');
+      timelineChart = new Chart(ctx, {
+        type: 'line',
+        data: { labels: b.labels, datasets: datasets },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          onClick: function(evt, elements) {
+            if (timelineDrillProvider) return;
+            if (!elements.length) return;
+            timelineDrillProvider = groupNames[elements[0].datasetIndex];
+            document.getElementById('timeline-title').textContent = timelineDrillProvider + ' — Models';
+            document.getElementById('timeline-back').style.display = 'inline-flex';
+            buildTimeline();
+          },
+          plugins: {
+            legend: { labels: { color: '#a1a1aa', boxWidth: 12, padding: 16 } },
+            tooltip: {
+              backgroundColor: '#18181b', titleColor: '#fafafa', bodyColor: '#fafafa',
+              borderColor: '#27272a', borderWidth: 1, padding: 10,
+              callbacks: { label: function(c) { return c.dataset.label + ': ' + fmt(c.raw) + ' tokens'; } }
+            }
+          },
+          scales: {
+            x: { ticks: { color: '#52525b', font: { size: 11 }, maxRotation: 45 }, grid: { color: 'rgba(255,255,255,0.03)' }, border: { display: false } },
+            y: { beginAtZero: true, ticks: { color: '#52525b', font: { size: 11 }, callback: function(v) { return fmt(v); } }, grid: { color: 'rgba(255,255,255,0.03)' }, border: { display: false } }
+          }
+        }
+      });
+    })
+    .catch(function() {});
+}
+
 window._buildCharts = function() {
   fetchUsage(function(data) { buildBar(data); });
+  buildTimeline();
 };
 
 // --- Model Detail ---
 var detailChart = null;
+var detailRecords = [];
+var detailPage = 0;
+var detailPageSize = 10;
+var detailProvider = '';
+var detailModel = '';
 
 function showModelDetail(provider, model) {
+  detailProvider = provider;
+  detailModel = model;
   document.getElementById('detail-title').textContent = provider + ' / ' + model;
-  document.getElementById('detail-summary').innerHTML = '<div class="detail-loading">Loading...</div>';
-  document.getElementById('detail-tbody').innerHTML = '';
-  if (detailChart) { detailChart.destroy(); detailChart = null; }
   document.getElementById('detail-modal').style.display = 'flex';
 
-  fetch(API + '/api/usage/detail?provider=' + encodeURIComponent(provider) + '&model=' + encodeURIComponent(model) + '&days=7')
+  // Default: last 7 days
+  var now = new Date();
+  var from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+  document.getElementById('detail-from').value = from.toISOString().slice(0, 10);
+  document.getElementById('detail-to').value = now.toISOString().slice(0, 10);
+
+  loadDetailData();
+}
+
+function detailFilterByRange() {
+  loadDetailData();
+}
+
+function loadDetailData() {
+  document.getElementById('detail-summary').innerHTML = '<div class="detail-loading">Loading...</div>';
+  document.getElementById('detail-tbody').innerHTML = '';
+  document.getElementById('detail-pager').style.display = 'none';
+  if (detailChart) { detailChart.destroy(); detailChart = null; }
+
+  var fromVal = document.getElementById('detail-from').value;
+  var toVal = document.getElementById('detail-to').value;
+
+  // Calculate days for API query (generous to cover full date range)
+  var days = 30;
+  if (fromVal) {
+    var diff = Date.now() - new Date(fromVal).getTime();
+    days = Math.max(Math.ceil(diff / 86400000) + 1, 1);
+  }
+
+  fetch(API + '/api/usage/detail?provider=' + encodeURIComponent(detailProvider) + '&model=' + encodeURIComponent(detailModel) + '&days=' + days)
     .then(function(r) { return r.json(); })
     .then(function(records) {
       var arr = Array.isArray(records) ? records : [];
+
+      // Client-side date filter
+      if (fromVal) {
+        var fromMs = new Date(fromVal).getTime();
+        arr = arr.filter(function(r) { return new Date(r.timestamp).getTime() >= fromMs; });
+      }
+      if (toVal) {
+        var toMs = new Date(toVal).getTime() + 86400000; // include the whole day
+        arr = arr.filter(function(r) { return new Date(r.timestamp).getTime() < toMs; });
+      }
+
+      detailRecords = arr;
+      detailPage = 0;
+
+      // Summary
       var totalReq = 0, totalIn = 0, totalOut = 0, totalCost = 0;
       arr.forEach(function(r) {
         totalReq++;
@@ -541,28 +730,115 @@ function showModelDetail(provider, model) {
         '<div class="detail-stat"><div class="detail-stat-val">' + fmt(totalOut) + '</div><div class="detail-stat-lbl">Output</div></div>' +
         '<div class="detail-stat"><div class="detail-stat-val">$' + totalCost.toFixed(4) + '</div><div class="detail-stat-lbl">Cost</div></div>';
 
-      // Recent requests table
-      var tbody = document.getElementById('detail-tbody');
-      arr.slice(0, 50).forEach(function(r) {
-        var ts = r.timestamp ? r.timestamp.replace('T', ' ').slice(0, 19) : '';
-        var statusClass = (r.status >= 400) ? 'detail-status-err' : 'detail-status-ok';
-        tbody.innerHTML +=
-          '<tr>' +
-          '<td>' + esc(ts) + '</td>' +
-          '<td>' + esc(r.requested_model || '') + '</td>' +
-          '<td>' + fmt(r.input_tokens || 0) + '</td>' +
-          '<td>' + fmt(r.output_tokens || 0) + '</td>' +
-          '<td>' + (r.latency_ms || 0) + 'ms</td>' +
-          '<td><span class="' + statusClass + '">' + (r.status || 0) + '</span></td>' +
-          '</tr>';
-      });
-      if (!arr.length) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-3);padding:24px;">No requests found</td></tr>';
-      }
+      // Request Trend — build day buckets from selected range
+      buildDetailTrend(arr, fromVal, toVal);
+      renderDetailPage();
     })
     .catch(function(e) {
       document.getElementById('detail-summary').innerHTML = '<div class="detail-loading">Error: ' + esc(e.message) + '</div>';
     });
+}
+
+function buildDetailTrend(arr, fromVal, toVal) {
+  if (detailChart) { detailChart.destroy(); detailChart = null; }
+
+  var start = fromVal ? new Date(fromVal) : new Date(Date.now() - 6 * 86400000);
+  var end = toVal ? new Date(toVal) : new Date();
+  start = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  end = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+
+  var dayKeys = [], dayLabels = [];
+  var d = new Date(start);
+  while (d <= end) {
+    dayKeys.push(d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()));
+    dayLabels.push(pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()));
+    d.setDate(d.getDate() + 1);
+  }
+
+  var dayAgg = {};
+  arr.forEach(function(r) {
+    var dd = new Date(r.timestamp);
+    var k = dd.getFullYear() + '-' + pad2(dd.getMonth() + 1) + '-' + pad2(dd.getDate());
+    dayAgg[k] = (dayAgg[k] || 0) + (r.input_tokens || 0) + (r.output_tokens || 0);
+  });
+  var trendData = dayKeys.map(function(k) { return dayAgg[k] || 0; });
+  var trendMax = Math.max.apply(null, trendData);
+  var yMax = Math.max(trendMax * 1.2, 1);
+
+  var ctx = document.getElementById('detailChart').getContext('2d');
+  detailChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: dayLabels,
+      datasets: [{
+        label: 'Tokens',
+        data: trendData,
+        backgroundColor: '#818cf855',
+        borderColor: '#818cf8',
+        borderWidth: 1, borderRadius: 4, barThickness: 16
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#18181b', titleColor: '#fafafa', bodyColor: '#fafafa',
+          borderColor: '#27272a', borderWidth: 1, padding: 10,
+          callbacks: { label: function(c) { return fmt(c.raw) + ' tokens'; } }
+        }
+      },
+      scales: {
+        x: { ticks: { color: '#52525b', font: { size: 11 }, maxRotation: 45 }, grid: { display: false }, border: { display: false } },
+        y: { min: 0, max: yMax, ticks: { color: '#52525b', font: { size: 11 }, callback: function(v) { return fmt(v); } }, grid: { color: 'rgba(255,255,255,0.03)' }, border: { display: false } }
+      }
+    }
+  });
+}
+
+function renderDetailPage() {
+  var arr = detailRecords;
+  var tbody = document.getElementById('detail-tbody');
+  var pagerEl = document.getElementById('detail-pager');
+  var totalPages = Math.ceil(arr.length / detailPageSize) || 1;
+
+  var start = detailPage * detailPageSize;
+  var slice = arr.slice(start, start + detailPageSize);
+
+  tbody.innerHTML = '';
+  if (!arr.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-3);padding:24px;">No requests found</td></tr>';
+    pagerEl.style.display = 'none';
+    return;
+  }
+
+  slice.forEach(function(r) {
+    var ts = r.timestamp ? r.timestamp.replace('T', ' ').slice(0, 19) : '';
+    var statusClass = (r.status >= 400) ? 'detail-status-err' : 'detail-status-ok';
+    tbody.innerHTML +=
+      '<tr>' +
+      '<td>' + esc(ts) + '</td>' +
+      '<td>' + esc(r.requested_model || '') + '</td>' +
+      '<td>' + fmt(r.input_tokens || 0) + '</td>' +
+      '<td>' + fmt(r.output_tokens || 0) + '</td>' +
+      '<td>' + (r.latency_ms || 0) + 'ms</td>' +
+      '<td><span class="' + statusClass + '">' + (r.status || 0) + '</span></td>' +
+      '</tr>';
+  });
+
+  pagerEl.style.display = 'flex';
+  document.getElementById('detail-page-info').textContent = (detailPage + 1) + ' / ' + totalPages;
+  document.getElementById('detail-prev-btn').disabled = detailPage === 0;
+  document.getElementById('detail-next-btn').disabled = detailPage >= totalPages - 1;
+}
+
+function detailPrevPage() {
+  if (detailPage > 0) { detailPage--; renderDetailPage(); }
+}
+
+function detailNextPage() {
+  var totalPages = Math.ceil(detailRecords.length / detailPageSize);
+  if (detailPage < totalPages - 1) { detailPage++; renderDetailPage(); }
 }
 
 function closeDetail() {

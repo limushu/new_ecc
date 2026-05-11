@@ -295,12 +295,18 @@
   <div class="modal-content modal-detail">
     <div class="detail-head">
       <h3 id="detail-title">Model Detail</h3>
+      <div class="detail-range">
+        <input type="date" id="detail-from" class="detail-date" />
+        <span style="color:var(--text-3);font-size:12px;">~</span>
+        <input type="date" id="detail-to" class="detail-date" />
+        <button class="btn" onclick="detailFilterByRange()" style="background:var(--surface-2);color:var(--text-2);font-size:12px;padding:4px 10px;">Query</button>
+      </div>
       <button class="btn" style="background:var(--surface-3);color:var(--text-2);" onclick="closeDetail()">Close</button>
     </div>
     <div class="detail-summary" id="detail-summary"></div>
     <div class="detail-section">
       <div class="detail-section-title">Request Trend</div>
-      <canvas id="detailChart" height="160"></canvas>
+      <div class="detail-trend-wrap"><canvas id="detailChart"></canvas></div>
     </div>
     <div class="detail-section">
       <div class="detail-section-title">Recent Requests</div>
@@ -309,6 +315,11 @@
           <thead><tr><th>Time</th><th>Claude Model</th><th>Input</th><th>Output</th><th>Latency</th><th>Status</th></tr></thead>
           <tbody id="detail-tbody"></tbody>
         </table>
+      </div>
+      <div id="detail-pager" class="detail-pager" style="display:none;">
+        <button class="btn" id="detail-prev-btn" onclick="detailPrevPage()" style="background:var(--surface-2);color:var(--text-2);font-size:12px;padding:4px 12px;">&larr; Prev</button>
+        <span id="detail-page-info" style="color:var(--text-3);font-size:12px;">1 / 1</span>
+        <button class="btn" id="detail-next-btn" onclick="detailNextPage()" style="background:var(--surface-2);color:var(--text-2);font-size:12px;padding:4px 12px;">Next &rarr;</button>
       </div>
     </div>
   </div>

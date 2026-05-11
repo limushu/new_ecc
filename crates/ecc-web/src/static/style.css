@@ -201,6 +201,7 @@ body {
 .chart-card {
   background: var(--surface); border: 1px solid var(--surface-2);
   border-radius: var(--radius); padding: 24px; margin-bottom: 20px;
+  position: relative; height: 260px;
 }
 
 /* Provider cards */
@@ -547,6 +548,11 @@ select {
 .detail-table tr:hover td { background: var(--surface-2); }
 .detail-status-ok { color: var(--green); font-weight: 600; }
 .detail-status-err { color: var(--red); font-weight: 600; }
+.detail-trend-wrap { position: relative; height: 280px; }
+.detail-range { display: flex; align-items: center; gap: 6px; }
+.detail-date { background: var(--surface-2); border: 1px solid var(--surface-3); color: var(--text-1); border-radius: 4px; padding: 3px 8px; font-size: 12px; outline: none; }
+.detail-date::-webkit-calendar-picker-indicator { filter: invert(0.6); }
+.detail-pager { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 12px; padding: 8px 0; }
 .detail-loading { text-align: center; padding: 32px; color: var(--text-3); }
 
 @media (max-width: 640px) {

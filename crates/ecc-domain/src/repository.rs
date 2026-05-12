@@ -96,3 +96,43 @@ pub struct QuotaTier {
     pub utilization: f64,
     pub resets_at: Option<String>,
 }
+
+// --- Session ---
+
+pub trait SessionRepository: Send + Sync {
+    fn record(&self, record: SessionRecord) -> Result<(), RepositoryError>;
+    fn list_sessions(&self, limit: u64) -> Result<Vec<SessionSummary>, RepositoryError>;
+    fn get_session(&self, session_id: &str) -> Result<Vec<SessionRecord>, RepositoryError>;
+    fn delete_session(&self, session_id: &str) -> Result<(), RepositoryError>;
+    /// Find the most recent session_id whose first record matches the base hash prefix.
+    /// Returns (session_id, last_timestamp) if found.
+    fn find_latest_by_prefix(&self, base_hash: &str) -> Result<Option<(String, DateTime<Utc>)>, RepositoryError>;
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SessionRecord {
+    pub id: String,
+    pub session_id: String,
+    pub timestamp: DateTime<Utc>,
+    pub provider_name: String,
+    pub target_model: String,
+    pub requested_model: String,
+    pub request_body: String,
+    pub response_body: String,
+    pub assistant_text: String,
+    pub thinking_text: String,
+    pub input_tokens: u64,
+    pub output_tokens: u64,
+    pub latency_ms: u64,
+    pub status: u16,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SessionSummary {
+    pub session_id: String,
+    pub first_timestamp: DateTime<Utc>,
+    pub last_timestamp: DateTime<Utc>,
+    pub total_turns: u64,
+    pub provider_name: String,
+    pub requested_model: String,
+}

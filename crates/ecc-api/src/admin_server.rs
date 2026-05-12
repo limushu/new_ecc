@@ -9,44 +9,49 @@ use hyper::{Request, Response};
 use ecc_app::provider_service::{CreateProviderCommand, ProviderService, UpdateProviderCommand};
 use ecc_app::preset_service::PresetService;
 use ecc_app::quota_service::QuotaService;
+use ecc_app::session_service::SessionService;
 use ecc_app::usage_service::UsageService;
 use ecc_app::PlaygroundService;
 use ecc_app::{PlaygroundRequest, PlaygroundResponse};
 use ecc_domain::repository::{
     ConfigRepository, PresetRepository, ProviderRepository, RouteRepository,
-    UsageRepository,
+    SessionRepository, UsageRepository,
 };
 
 type BoxBody = Full<Bytes>;
 
-pub struct AdminServer<P, C, R, U, PR>
+pub struct AdminServer<P, C, R, U, S, PR>
 where
     P: ProviderRepository,
     C: ConfigRepository,
     R: RouteRepository,
     U: UsageRepository,
+    S: SessionRepository,
     PR: PresetRepository,
 {
     provider_service: Arc<ProviderService<P, C, R>>,
     preset_service: Arc<PresetService<PR>>,
     usage_service: Arc<UsageService<U>>,
+    session_service: Arc<SessionService<S>>,
     quota_service: Arc<QuotaService>,
     playground_service: Arc<PlaygroundService>,
     client: reqwest::Client,
 }
 
-impl<P, C, R, U, PR> AdminServer<P, C, R, U, PR>
+impl<P, C, R, U, S, PR> AdminServer<P, C, R, U, S, PR>
 where
     P: ProviderRepository + 'static,
     C: ConfigRepository + 'static,
     R: RouteRepository + 'static,
     U: UsageRepository + 'static,
+    S: SessionRepository + 'static,
     PR: PresetRepository + 'static,
 {
     pub fn new(
         provider_service: Arc<ProviderService<P, C, R>>,
         preset_service: Arc<PresetService<PR>>,
         usage_service: Arc<UsageService<U>>,
+        session_service: Arc<SessionService<S>>,
         quota_service: Arc<QuotaService>,
         playground_service: Arc<PlaygroundService>,
         client: reqwest::Client,
@@ -55,6 +60,7 @@ where
             provider_service,
             preset_service,
             usage_service,
+            session_service,
             quota_service,
             playground_service,
             client,
@@ -160,6 +166,17 @@ where
                 }
             }
 
+            // Sessions
+            Route::ListSessions => {
+                handle_result(self.session_service.list_sessions(50))
+            }
+            Route::GetSession(id) => {
+                handle_result(self.session_service.get_session(&id))
+            }
+            Route::DeleteSession(id) => {
+                handle_result(self.session_service.delete_session(&id))
+            }
+
             // Playground
             Route::Playground => {
                 let req = parse_body::<PlaygroundRequest>(&body_bytes);
@@ -211,6 +228,9 @@ enum Route {
     ListRoutes,
     UsageStats,
     UsageDetail,
+    ListSessions,
+    GetSession(String),
+    DeleteSession(String),
     QueryAllQuotas,
     QueryQuota(String),
     Playground,
@@ -230,6 +250,13 @@ impl Route {
             ("POST", "/api/presets") => Self::CreatePreset,
             ("GET", "/api/usage") => Self::UsageStats,
             ("GET", p) if p.starts_with("/api/usage/detail") => Self::UsageDetail,
+            ("GET", "/api/sessions") => Self::ListSessions,
+            ("GET", p) if p.starts_with("/api/sessions/") => {
+                Self::GetSession(p.trim_start_matches("/api/sessions/").to_string())
+            }
+            ("DELETE", p) if p.starts_with("/api/sessions/") => {
+                Self::DeleteSession(p.trim_start_matches("/api/sessions/").to_string())
+            }
             ("GET", "/api/quota") => Self::QueryAllQuotas,
             ("POST", "/api/playground") => Self::Playground,
             ("PUT", p) if p.starts_with("/api/providers/") => {

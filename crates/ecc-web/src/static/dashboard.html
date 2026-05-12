@@ -44,6 +44,7 @@
   <div class="tabs">
     <button class="tab active" data-tab="routes">Routes</button>
     <button class="tab" data-tab="usage">Usage</button>
+    <button class="tab" data-tab="sessions">Sessions</button>
     <button class="tab" data-tab="playground">Playground</button>
   </div>
 
@@ -83,6 +84,18 @@
       </div>
     </div>
     <div class="chart-card"><canvas id="timelineChart" height="200"></canvas></div>
+  </div>
+
+  <!-- Sessions Panel -->
+  <div id="panel-sessions" class="tab-panel">
+    <div class="section-head">
+      <div class="section-title">Sessions</div>
+      <div class="tooltip-wrap">
+        <span class="help-tip">?</span>
+        <span class="tooltip">Conversations auto-grouped by first user message + system prompt</span>
+      </div>
+    </div>
+    <div id="sessions-list"></div>
   </div>
 
   <!-- Playground Panel -->
@@ -322,6 +335,22 @@
         <button class="btn" id="detail-next-btn" onclick="detailNextPage()" style="background:var(--surface-2);color:var(--text-2);font-size:12px;padding:4px 12px;">Next &rarr;</button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- Session Detail Modal -->
+<div id="session-modal" class="modal">
+  <div class="modal-overlay" onclick="closeSessionDetail()"></div>
+  <div class="modal-content modal-session">
+    <div class="ses-head">
+      <h3 id="ses-title">Session</h3>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span class="ses-meta" id="ses-meta"></span>
+        <button class="btn" onclick="deleteSession()" style="background:var(--red-bg);color:var(--red);font-size:12px;padding:4px 10px;">Delete</button>
+        <button class="btn" style="background:var(--surface-3);color:var(--text-2);" onclick="closeSessionDetail()">Close</button>
+      </div>
+    </div>
+    <div class="ses-chat" id="ses-chat"></div>
   </div>
 </div>
 

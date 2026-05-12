@@ -25,6 +25,7 @@ function switchTab(tabName) {
   location.hash = tabName;
   if (tabName === 'routes') loadRoutes();
   if (tabName === 'usage' && window._buildCharts) window._buildCharts();
+  if (tabName === 'sessions') loadSessions();
   if (tabName === 'playground') pgLoadModels();
 }
 
@@ -430,6 +431,7 @@ document.addEventListener('keydown', function(e) {
     closeEditProvider();
     closeAddMapping();
     closeDetail();
+    closeSessionDetail();
   }
 });
 
@@ -843,6 +845,228 @@ function detailNextPage() {
 
 function closeDetail() {
   document.getElementById('detail-modal').style.display = 'none';
+}
+
+// --- Sessions ---
+var sessionListData = [];
+var currentSessionId = '';
+
+function loadSessions() {
+  var container = document.getElementById('sessions-list');
+  container.innerHTML = '<div class="detail-loading">Loading...</div>';
+
+  fetch(API + '/api/sessions')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      sessionListData = Array.isArray(data) ? data : [];
+      renderSessions();
+    })
+    .catch(function(e) {
+      container.innerHTML = '<div class="detail-loading">Error: ' + esc(e.message) + '</div>';
+    });
+}
+
+function renderSessions() {
+  var container = document.getElementById('sessions-list');
+  if (!sessionListData.length) {
+    container.innerHTML = '<div class="empty">No sessions recorded yet. Send requests through the proxy to see conversations here.</div>';
+    return;
+  }
+
+  var html = '<div class="ses-toolbar">' +
+    '<label class="ses-check-all"><input type="checkbox" id="ses-select-all" onchange="toggleAllSessions(this.checked)" /><span>Select All</span></label>' +
+    '<button class="btn" id="ses-batch-del" onclick="batchDeleteSessions()" style="display:none;background:var(--red-bg);color:var(--red);font-size:12px;padding:4px 12px;">Delete Selected (<span id="ses-selected-count">0</span>)</button>' +
+    '</div>';
+
+  html += '<table class="ses-table"><thead><tr>' +
+    '<th style="width:30px;"></th>' +
+    '<th>Session</th><th>Provider</th><th>Model</th><th>Turns</th><th>Last Active</th><th></th>' +
+    '</tr></thead><tbody>';
+
+  sessionListData.forEach(function(s) {
+    var shortId = s.session_id.length > 12 ? s.session_id.slice(0, 12) + '...' : s.session_id;
+    var lastActive = s.last_timestamp ? timeAgo(s.last_timestamp) : '';
+    html += '<tr class="ses-row" onclick="showSessionDetail(\'' + escJs(s.session_id) + '\')">' +
+      '<td onclick="event.stopPropagation()"><input type="checkbox" class="ses-check" data-id="' + esc(s.session_id) + '" onchange="onSessionCheckChange()" /></td>' +
+      '<td><code class="ses-id">' + esc(shortId) + '</code></td>' +
+      '<td>' + esc(s.provider_name || '') + '</td>' +
+      '<td>' + esc(s.requested_model || '') + '</td>' +
+      '<td>' + (s.total_turns || 0) + '</td>' +
+      '<td style="color:var(--text-3);">' + esc(lastActive) + '</td>' +
+      '<td><button class="icon-btn" title="Delete session" onclick="event.stopPropagation();deleteSessionById(\'' + escJs(s.session_id) + '\')">' +
+      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>' +
+      '</button></td>' +
+      '</tr>';
+  });
+
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+function getCheckedSessionIds() {
+  var checks = document.querySelectorAll('.ses-check:checked');
+  var ids = [];
+  checks.forEach(function(c) { ids.push(c.getAttribute('data-id')); });
+  return ids;
+}
+
+function onSessionCheckChange() {
+  var ids = getCheckedSessionIds();
+  var btn = document.getElementById('ses-batch-del');
+  var count = document.getElementById('ses-selected-count');
+  if (ids.length > 0) {
+    btn.style.display = 'inline-flex';
+    count.textContent = ids.length;
+  } else {
+    btn.style.display = 'none';
+  }
+  // Update select-all state
+  var allChecks = document.querySelectorAll('.ses-check');
+  var allBox = document.getElementById('ses-select-all');
+  allBox.checked = allChecks.length > 0 && ids.length === allChecks.length;
+}
+
+function toggleAllSessions(checked) {
+  document.querySelectorAll('.ses-check').forEach(function(c) { c.checked = checked; });
+  onSessionCheckChange();
+}
+
+function batchDeleteSessions() {
+  var ids = getCheckedSessionIds();
+  if (!ids.length) return;
+  if (!confirm('Delete ' + ids.length + ' selected session(s)?')) return;
+
+  var pending = ids.length;
+  ids.forEach(function(id) {
+    fetch(API + '/api/sessions/' + encodeURIComponent(id), { method: 'DELETE' })
+      .then(function() {
+        pending--;
+        if (pending === 0) {
+          toast(ids.length + ' session(s) deleted');
+          loadSessions();
+        }
+      })
+      .catch(function(e) { toast('Error: ' + e.message, 'error'); });
+  });
+}
+
+function timeAgo(ts) {
+  var diff = Date.now() - new Date(ts).getTime();
+  var sec = Math.floor(diff / 1000);
+  if (sec < 60) return sec + 's ago';
+  var min = Math.floor(sec / 60);
+  if (min < 60) return min + 'm ago';
+  var hr = Math.floor(min / 60);
+  if (hr < 24) return hr + 'h ago';
+  var d = Math.floor(hr / 24);
+  if (d < 30) return d + 'd ago';
+  return ts.replace('T', ' ').slice(0, 10);
+}
+
+function showSessionDetail(sessionId) {
+  currentSessionId = sessionId;
+  document.getElementById('ses-title').textContent = 'Session ' + sessionId.slice(0, 16);
+  document.getElementById('ses-chat').innerHTML = '<div class="detail-loading">Loading...</div>';
+  document.getElementById('session-modal').style.display = 'flex';
+
+  fetch(API + '/api/sessions/' + encodeURIComponent(sessionId))
+    .then(function(r) { return r.json(); })
+    .then(function(records) {
+      var arr = Array.isArray(records) ? records : [];
+      if (!arr.length) {
+        document.getElementById('ses-chat').innerHTML = '<div class="empty">No records found</div>';
+        return;
+      }
+
+      var meta = arr.length + ' turns · ' + (arr[0].provider_name || '') + ' / ' + (arr[0].target_model || '');
+      document.getElementById('ses-meta').textContent = meta;
+
+      var html = '';
+      arr.forEach(function(rec, i) {
+        var userMsg = extractUserMessage(rec.request_body);
+        var assistantMsg = rec.assistant_text || '';
+        var thinking = rec.thinking_text || '';
+        var ts = rec.timestamp ? rec.timestamp.replace('T', ' ').slice(0, 19) : '';
+
+        html += '<div class="ses-turn">' +
+          '<div class="ses-turn-head">' +
+          '<span class="ses-turn-num">#' + (i + 1) + '</span>' +
+          '<span class="ses-turn-time">' + esc(ts) + '</span>' +
+          '<span class="ses-turn-stats">' + fmt(rec.input_tokens || 0) + ' in / ' + fmt(rec.output_tokens || 0) + ' out · ' + (rec.latency_ms || 0) + 'ms</span>' +
+          '</div>';
+
+        // User message
+        html += '<div class="ses-msg ses-msg-user">' +
+          '<div class="ses-msg-role ses-role-user">User</div>' +
+          '<div class="ses-msg-body">' + escapeHtml(userMsg) + '</div>' +
+          '</div>';
+
+        // Thinking (collapsible)
+        if (thinking) {
+          html += '<div class="ses-thinking-wrap">' +
+            '<button class="ses-thinking-toggle" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\';this.textContent=this.nextElementSibling.style.display===\'none\'?\'+ Thinking\':\'- Thinking\'">+ Thinking</button>' +
+            '<div class="ses-thinking-body" style="display:none;">' + escapeHtml(thinking) + '</div>' +
+            '</div>';
+        }
+
+        // Assistant message
+        html += '<div class="ses-msg ses-msg-assistant">' +
+          '<div class="ses-msg-role ses-role-assistant">Assistant</div>' +
+          '<div class="ses-msg-body">' + escapeHtml(assistantMsg) + '</div>' +
+          '</div>';
+
+        html += '</div>';
+      });
+
+      document.getElementById('ses-chat').innerHTML = html;
+      document.getElementById('ses-chat').scrollTop = document.getElementById('ses-chat').scrollHeight;
+    })
+    .catch(function(e) {
+      document.getElementById('ses-chat').innerHTML = '<div class="detail-loading">Error: ' + esc(e.message) + '</div>';
+    });
+}
+
+function extractUserMessage(body) {
+  try {
+    var obj = JSON.parse(body);
+    var messages = obj.messages || [];
+    // Get the last user message
+    for (var i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') {
+        var c = messages[i].content;
+        if (typeof c === 'string') return c;
+        if (Array.isArray(c)) {
+          return c.filter(function(b) { return b.type === 'text'; }).map(function(b) { return b.text || ''; }).join('\n');
+        }
+        return JSON.stringify(c);
+      }
+    }
+  } catch(e) {}
+  return body.slice(0, 500);
+}
+
+function deleteSession() {
+  if (!currentSessionId) return;
+  if (!confirm('Delete this entire session?')) return;
+  deleteSessionById(currentSessionId, function() {
+    closeSessionDetail();
+    loadSessions();
+  });
+}
+
+function deleteSessionById(id, cb) {
+  fetch(API + '/api/sessions/' + encodeURIComponent(id), { method: 'DELETE' })
+    .then(function(r) {
+      if (!r.ok) return r.json().then(function(d) { throw new Error(d.error); });
+      toast('Session deleted');
+      if (cb) cb(); else loadSessions();
+    })
+    .catch(function(e) { toast('Error: ' + e.message, 'error'); });
+}
+
+function closeSessionDetail() {
+  document.getElementById('session-modal').style.display = 'none';
+  currentSessionId = '';
 }
 
 // --- Playground ---

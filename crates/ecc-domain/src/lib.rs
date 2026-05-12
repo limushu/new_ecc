@@ -15,5 +15,6 @@ pub use mapping::{ModelMapping, RouteTarget};
 pub use pricing::Pricing;
 pub use repository::{
     ConfigRepository, PresetRepository, ProviderRepository, ProviderUsage, QuotaInfo,
-    QuotaTier, RepositoryError, RouteRepository, UsageRecord, UsageRepository,
+    QuotaTier, RepositoryError, RouteRepository, SessionRecord, SessionRepository,
+    SessionSummary, UsageRecord, UsageRepository,
 };

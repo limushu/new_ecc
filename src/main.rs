@@ -4,6 +4,7 @@ use ecc_api::{AdminServer, ProxyServer};
 use ecc_app::provider_service::ProviderService;
 use ecc_app::preset_service::PresetService;
 use ecc_app::quota_service::QuotaService;
+use ecc_app::session_service::SessionService;
 use ecc_app::usage_service::UsageService;
 use ecc_app::PlaygroundService;
 use ecc_engine::circuit_breaker::CircuitBreaker;
@@ -13,10 +14,11 @@ use ecc_engine::middleware::Pipeline;
 use ecc_engine::rectifier::ThinkingRectifier;
 use ecc_engine::reqwest_forwarder::ReqwestForwarder;
 use ecc_engine::router::Router;
+use ecc_engine::session_recorder::SessionRecorder;
 use ecc_engine::usage_tracker::UsageTracker;
 use ecc_domain::repository::RouteRepository;
 use ecc_engine::circuit_breaker::CircuitBreakerConfig;
-use ecc_infra::{ConfigRepo, PresetRepo, ProviderRepo, RouteRepo, SqliteRepo, UsageRepo};
+use ecc_infra::{ConfigRepo, PresetRepo, ProviderRepo, RouteRepo, SessionRepo, SqliteRepo, UsageRepo};
 use hyper_util::rt::TokioIo;
 use tokio::net::TcpListener;
 use tracing_subscriber::EnvFilter;
@@ -55,6 +57,7 @@ async fn async_main() {
     let config_repo = Arc::new(ConfigRepo::new(store.clone()));
     let preset_repo = Arc::new(PresetRepo::new(store.clone()));
     let usage_repo = Arc::new(UsageRepo::new(store.clone()));
+    let session_repo = Arc::new(SessionRepo::new(store.clone()));
 
     // DB seed
     let seed_count =
@@ -73,6 +76,7 @@ async fn async_main() {
     ));
     let preset_service = Arc::new(PresetService::new(preset_repo));
     let usage_service = Arc::new(UsageService::new(usage_repo.clone()));
+    let session_service = Arc::new(SessionService::new(session_repo.clone()));
     let quota_service = Arc::new(QuotaService::new());
     let playground_service = Arc::new(PlaygroundService::new());
 
@@ -90,7 +94,8 @@ async fn async_main() {
                 cooldown: std::time::Duration::from_secs(30),
             })))
             .add(Arc::new(Forwarder::new(forward_port)))
-            .add(Arc::new(UsageTracker::new(usage_repo))),
+            .add(Arc::new(UsageTracker::new(usage_repo)))
+            .add(Arc::new(SessionRecorder::new(session_repo))),
     );
 
     let proxy_server = ProxyServer::new(pipeline);
@@ -102,6 +107,7 @@ async fn async_main() {
         provider_service,
         preset_service,
         usage_service,
+        session_service,
         quota_service,
         playground_service,
         reqwest_client,
@@ -145,12 +151,13 @@ async fn run_proxy(port: u16, server: ProxyServer) {
     }
 }
 
-async fn run_admin<P, C, R, U, PR>(port: u16, server: Arc<AdminServer<P, C, R, U, PR>>)
+async fn run_admin<P, C, R, U, S, PR>(port: u16, server: Arc<AdminServer<P, C, R, U, S, PR>>)
 where
     P: ecc_domain::repository::ProviderRepository + 'static,
     C: ecc_domain::repository::ConfigRepository + 'static,
     R: ecc_domain::repository::RouteRepository + 'static,
     U: ecc_domain::repository::UsageRepository + 'static,
+    S: ecc_domain::repository::SessionRepository + 'static,
     PR: ecc_domain::repository::PresetRepository + 'static,
 {
     let listener = TcpListener::bind(format!("0.0.0.0:{port}"))

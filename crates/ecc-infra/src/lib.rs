@@ -6,6 +6,7 @@ pub mod provider_repo;
 pub mod route_repo;
 pub mod schema;
 pub mod seed;
+pub mod session_repo;
 pub mod store;
 pub mod usage_repo;
 
@@ -13,5 +14,6 @@ pub use config_repo::ConfigRepo;
 pub use preset_repo::PresetRepo;
 pub use provider_repo::ProviderRepo;
 pub use route_repo::RouteRepo;
+pub use session_repo::SessionRepo;
 pub use store::SqliteRepo;
 pub use usage_repo::UsageRepo;

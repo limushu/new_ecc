@@ -9,6 +9,7 @@ pub mod port;
 pub mod rectifier;
 pub mod reqwest_forwarder;
 pub mod router;
+pub mod session_recorder;
 pub mod usage_tracker;
 
 pub use circuit_breaker::CircuitBreaker;
@@ -19,4 +20,5 @@ pub use middleware::{Middleware, Pipeline, PipelineError};
 pub use rectifier::ThinkingRectifier;
 pub use reqwest_forwarder::ReqwestForwarder;
 pub use router::Router;
+pub use session_recorder::SessionRecorder;
 pub use usage_tracker::UsageTracker;

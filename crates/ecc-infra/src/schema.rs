@@ -56,7 +56,24 @@ pub fn init_schema(conn: &Connection) -> Result<(), RepositoryError> {
             status            INTEGER NOT NULL DEFAULT 0
         );
         CREATE INDEX IF NOT EXISTS idx_usage_ts ON usage_records(timestamp);
-        CREATE INDEX IF NOT EXISTS idx_routes_model ON routes(claude_model, priority);",
+        CREATE INDEX IF NOT EXISTS idx_routes_model ON routes(claude_model, priority);
+        CREATE TABLE IF NOT EXISTS session_records (
+            id               INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id       TEXT NOT NULL,
+            timestamp        TEXT NOT NULL,
+            provider_name    TEXT NOT NULL,
+            target_model     TEXT NOT NULL,
+            requested_model  TEXT NOT NULL,
+            request_body     TEXT NOT NULL,
+            response_body    TEXT NOT NULL,
+            assistant_text   TEXT NOT NULL DEFAULT '',
+            thinking_text    TEXT NOT NULL DEFAULT '',
+            input_tokens     INTEGER NOT NULL DEFAULT 0,
+            output_tokens    INTEGER NOT NULL DEFAULT 0,
+            latency_ms       INTEGER NOT NULL DEFAULT 0,
+            status           INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE INDEX IF NOT EXISTS idx_session_id ON session_records(session_id, timestamp);",
     ).map_err(|e| RepositoryError::Storage(e.into()))?;
     Ok(())
 }

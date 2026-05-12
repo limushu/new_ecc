@@ -31,6 +31,7 @@ impl Middleware for SessionRecorder {
             };
 
             let session_id = self.resolve_session(&base_hash);
+            tracing::debug!(base_hash, session_id, "resolved session");
 
             let result = next.run(ctx).await;
 
@@ -47,6 +48,13 @@ impl Middleware for SessionRecorder {
                 };
 
                 let (assistant_text, thinking_text) = parse_response(&response_body);
+                tracing::debug!(
+                    assistant_len = assistant_text.len(),
+                    thinking_len = thinking_text.len(),
+                    response_len = response_body.len(),
+                    is_streaming = !ctx.stream_chunks.is_empty(),
+                    "parsed session response",
+                );
 
                 let usage = ctx.usage.as_ref();
                 let record = SessionRecord {
@@ -125,10 +133,6 @@ fn extract_base_hash(body: &[u8]) -> Option<String> {
 
     use std::hash::{Hash, Hasher};
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
-
-    if let Some(system) = obj.get("system") {
-        system.to_string().hash(&mut hasher);
-    }
 
     content_str.hash(&mut hasher);
     Some(format!("ses_{:016x}", hasher.finish()))

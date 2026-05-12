@@ -75,5 +75,15 @@ pub fn init_schema(conn: &Connection) -> Result<(), RepositoryError> {
         );
         CREATE INDEX IF NOT EXISTS idx_session_id ON session_records(session_id, timestamp);",
     ).map_err(|e| RepositoryError::Storage(e.into()))?;
+
+    // Migrations for existing tables
+    let migrations = [
+        "ALTER TABLE session_records ADD COLUMN assistant_text TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE session_records ADD COLUMN thinking_text TEXT NOT NULL DEFAULT ''",
+    ];
+    for sql in &migrations {
+        let _ = conn.execute(sql, []);
+    }
+
     Ok(())
 }

@@ -1001,18 +1001,16 @@ function showSessionDetail(sessionId) {
           '<div class="ses-msg-body">' + escapeHtml(userMsg) + '</div>' +
           '</div>';
 
-        // Thinking (collapsible)
+        // Assistant message (thinking inside, between label and body)
+        html += '<div class="ses-msg ses-msg-assistant">' +
+          '<div class="ses-msg-role ses-role-assistant">Assistant</div>';
         if (thinking) {
           html += '<div class="ses-thinking-wrap">' +
             '<button class="ses-thinking-toggle" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\';this.textContent=this.nextElementSibling.style.display===\'none\'?\'+ Thinking\':\'- Thinking\'">+ Thinking</button>' +
             '<div class="ses-thinking-body" style="display:none;">' + escapeHtml(thinking) + '</div>' +
             '</div>';
         }
-
-        // Assistant message
-        html += '<div class="ses-msg ses-msg-assistant">' +
-          '<div class="ses-msg-role ses-role-assistant">Assistant</div>' +
-          '<div class="ses-msg-body">' + escapeHtml(assistantMsg) + '</div>' +
+        html += '<div class="ses-msg-body">' + escapeHtml(assistantMsg) + '</div>' +
           '</div>';
 
         html += '</div>';
@@ -1030,19 +1028,36 @@ function extractUserMessage(body) {
   try {
     var obj = JSON.parse(body);
     var messages = obj.messages || [];
-    // Get the last user message
+    // Get the last user message, skip system-reminder only messages
     for (var i = messages.length - 1; i >= 0; i--) {
       if (messages[i].role === 'user') {
         var c = messages[i].content;
-        if (typeof c === 'string') return c;
-        if (Array.isArray(c)) {
-          return c.filter(function(b) { return b.type === 'text'; }).map(function(b) { return b.text || ''; }).join('\n');
+        var text = '';
+        if (typeof c === 'string') {
+          text = c;
+        } else if (Array.isArray(c)) {
+          text = c.filter(function(b) { return b.type === 'text'; }).map(function(b) { return b.text || ''; }).join('\n');
         }
-        return JSON.stringify(c);
+        // Strip system-reminder tags and surrounding noise
+        text = stripSystemReminders(text);
+        if (text.trim()) return text;
       }
     }
   } catch(e) {}
   return body.slice(0, 500);
+}
+
+function stripSystemReminders(text) {
+  // Remove all Claude Code injected tags: system-reminder, result, command-name, command-message, local-command-caveat
+  return text
+    .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, '')
+    .replace(/<result>[\s\S]*?<\/result>/g, '')
+    .replace(/<command-name>[\s\S]*?<\/command-name>/g, '')
+    .replace(/<command-message>[\s\S]*?<\/command-message>/g, '')
+    .replace(/<local-command-caveat>[\s\S]*?<\/local-command-caveat>/g, '')
+    .replace(/<system-reminder>[\s\S]*/g, '') // unclosed tag at end
+    .replace(/<[^>]+>/g, '') // any remaining XML tags
+    .trim();
 }
 
 function deleteSession() {

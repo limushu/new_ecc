@@ -256,13 +256,34 @@ fn format_tool_use(name: &str, input_json: &str) -> String {
     match name {
         "Edit" => {
             let path = input.get("file_path").and_then(|p| p.as_str()).unwrap_or("?");
+            let old = input.get("old_string").and_then(|s| s.as_str()).unwrap_or("");
             let new = input.get("new_string").and_then(|s| s.as_str()).unwrap_or("");
-            let preview = truncate(new, 120);
-            format!("[Edit] {}\n```{}\n```", path, preview)
+            let mut s = format!("[Edit] {}", path);
+            if !old.is_empty() || !new.is_empty() {
+                s.push_str("\n```diff\n");
+                if !old.is_empty() {
+                    for line in old.lines() {
+                        s.push_str("-");
+                        s.push_str(line);
+                        s.push('\n');
+                    }
+                }
+                if !new.is_empty() {
+                    for line in new.lines() {
+                        s.push_str("+");
+                        s.push_str(line);
+                        s.push('\n');
+                    }
+                }
+                s.push_str("```");
+            }
+            s
         }
         "Write" => {
             let path = input.get("file_path").and_then(|p| p.as_str()).unwrap_or("?");
-            format!("[Write] {}", path)
+            let content = input.get("content").and_then(|s| s.as_str()).unwrap_or("");
+            let display = truncate(content, 4000);
+            format!("[Write] {}\n```\n{}\n```", path, display)
         }
         "Read" => {
             let path = input.get("file_path").and_then(|p| p.as_str()).unwrap_or("?");
@@ -270,8 +291,7 @@ fn format_tool_use(name: &str, input_json: &str) -> String {
         }
         "Bash" => {
             let cmd = input.get("command").and_then(|c| c.as_str()).unwrap_or("?");
-            let display = truncate(cmd, 100);
-            format!("[Bash] {}", display)
+            format!("[Bash] {}", cmd)
         }
         _ => format!("[Tool: {}]", name),
     }

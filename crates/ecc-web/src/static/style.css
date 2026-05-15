@@ -633,6 +633,13 @@ select {
   font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
   color: var(--accent-2);
 }
+.ses-code-wrap { margin: 6px 0; }
+.ses-code-toggle {
+  background: none; border: 1px dashed var(--surface-3); color: var(--text-3);
+  font-size: 11px; padding: 2px 8px; border-radius: 4px; cursor: pointer;
+  font-family: inherit; transition: all 0.15s;
+}
+.ses-code-toggle:hover { border-color: var(--text-3); color: var(--text-2); }
 
 /* Thinking section (inside assistant message) */
 .ses-thinking { margin-bottom: 8px; }

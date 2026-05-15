@@ -50,9 +50,18 @@ function esc(s) { if (!s) return ''; var d = document.createElement('div'); d.te
 function renderContent(text) {
   if (!text) return '';
   var html = esc(text);
-  // Code blocks: ```lang\n...\n```
+  // Code blocks: ```lang\n...\n``` — collapsible if long (like thinking)
   html = html.replace(/```(\w*)\n([\s\S]*?)```/g, function(_, lang, code) {
-    return '<pre class="ses-code-block"' + (lang ? ' data-lang="' + lang + '"' : '') + '><code>' + code + '</code></pre>';
+    var lines = code.split('\n').length;
+    var collapsed = lines > 8;
+    var preHtml = '<pre class="ses-code-block"' + (lang ? ' data-lang="' + lang + '"' : '') + '><code>' + code + '</code></pre>';
+    if (collapsed) {
+      return '<div class="ses-code-wrap">' +
+        '<button class="ses-code-toggle" onclick="var b=this.nextElementSibling;b.style.display=b.style.display===\'none\'?\'block\':\'none\';this.textContent=b.style.display===\'none\'?\'+ Code (' + lines + ' lines)\':\'- Code\'">+ Code (' + lines + ' lines)</button>' +
+        '<pre class="ses-code-block"' + (lang ? ' data-lang="' + lang + '"' : '') + ' style="display:none;"><code>' + code + '</code></pre>' +
+        '</div>';
+    }
+    return preHtml;
   });
   // Inline code: `...`
   html = html.replace(/`([^`\n]+)`/g, '<code class="ses-code-inline">$1</code>');

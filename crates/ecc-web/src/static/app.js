@@ -46,6 +46,22 @@ function toast(msg, type) {
 }
 
 function esc(s) { if (!s) return ''; var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+function renderContent(text) {
+  if (!text) return '';
+  var html = esc(text);
+  // Code blocks: ```lang\n...\n```
+  html = html.replace(/```(\w*)\n([\s\S]*?)```/g, function(_, lang, code) {
+    return '<pre class="ses-code-block"' + (lang ? ' data-lang="' + lang + '"' : '') + '><code>' + code + '</code></pre>';
+  });
+  // Inline code: `...`
+  html = html.replace(/`([^`\n]+)`/g, '<code class="ses-code-inline">$1</code>');
+  // Bold: **...**
+  html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  // Links: [text](url)
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  return html;
+}
 function escJs(s) { return s.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"'); }
 
 // --- Preset data ---
@@ -982,38 +998,43 @@ function showSessionDetail(sessionId) {
       document.getElementById('ses-meta').textContent = meta;
 
       var html = '';
+      var lastUserMsg = '';
       arr.forEach(function(rec, i) {
         var userMsg = extractUserMessage(rec.request_body);
         var assistantMsg = rec.assistant_text || '';
         var thinking = rec.thinking_text || '';
         var ts = rec.timestamp ? rec.timestamp.replace('T', ' ').slice(0, 19) : '';
 
-        html += '<div class="ses-turn">' +
-          '<div class="ses-turn-head">' +
+        // Skip records with no assistant content at all
+        if (!assistantMsg && !thinking) return;
+
+        // Turn header (centered)
+        html += '<div class="ses-turn-head">' +
           '<span class="ses-turn-num">#' + (i + 1) + '</span>' +
           '<span class="ses-turn-time">' + esc(ts) + '</span>' +
           '<span class="ses-turn-stats">' + fmt(rec.input_tokens || 0) + ' in / ' + fmt(rec.output_tokens || 0) + ' out · ' + (rec.latency_ms || 0) + 'ms</span>' +
           '</div>';
 
-        // User message
-        html += '<div class="ses-msg ses-msg-user">' +
-          '<div class="ses-msg-role ses-role-user">User</div>' +
-          '<div class="ses-msg-body">' + escapeHtml(userMsg) + '</div>' +
-          '</div>';
+        // User message - only show if non-empty and different from previous
+        if (userMsg && userMsg !== lastUserMsg) {
+          html += '<div class="ses-msg ses-msg-user">' +
+            '<div class="ses-msg-role">You</div>' +
+            '<div class="ses-msg-body">' + renderContent(userMsg) + '</div>' +
+            '</div>';
+          lastUserMsg = userMsg;
+        }
 
-        // Assistant message (thinking inside, between label and body)
-        html += '<div class="ses-msg ses-msg-assistant">' +
-          '<div class="ses-msg-role ses-role-assistant">Assistant</div>';
+        // Assistant message
+        html += '<div class="ses-msg ses-msg-assistant">';
+        html += '<div class="ses-msg-role">Assistant</div>';
         if (thinking) {
-          html += '<div class="ses-thinking-wrap">' +
-            '<button class="ses-thinking-toggle" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\';this.textContent=this.nextElementSibling.style.display===\'none\'?\'+ Thinking\':\'- Thinking\'">+ Thinking</button>' +
-            '<div class="ses-thinking-body" style="display:none;">' + escapeHtml(thinking) + '</div>' +
+          html += '<div class="ses-thinking">' +
+            '<button class="ses-thinking-btn" onclick="var b=this.nextElementSibling;b.style.display=b.style.display===\'none\'?\'block\':\'none\';this.textContent=b.style.display===\'none\'?\'+ Thinking\':\'- Thinking\'">+ Thinking</button>' +
+            '<div class="ses-thinking-body" style="display:none;">' + renderContent(thinking) + '</div>' +
             '</div>';
         }
-        html += '<div class="ses-msg-body">' + escapeHtml(assistantMsg) + '</div>' +
+        html += '<div class="ses-msg-body">' + renderContent(assistantMsg) + '</div>' +
           '</div>';
-
-        html += '</div>';
       });
 
       document.getElementById('ses-chat').innerHTML = html;
@@ -1028,7 +1049,7 @@ function extractUserMessage(body) {
   try {
     var obj = JSON.parse(body);
     var messages = obj.messages || [];
-    // Get the last user message, skip system-reminder only messages
+    // Get the last user message, skip tool_result-only messages
     for (var i = messages.length - 1; i >= 0; i--) {
       if (messages[i].role === 'user') {
         var c = messages[i].content;
@@ -1036,15 +1057,22 @@ function extractUserMessage(body) {
         if (typeof c === 'string') {
           text = c;
         } else if (Array.isArray(c)) {
-          text = c.filter(function(b) { return b.type === 'text'; }).map(function(b) { return b.text || ''; }).join('\n');
+          // Check if this is a tool_result message (skip those)
+          var hasToolResult = c.some(function(b) { return b.type === 'tool_result'; });
+          if (hasToolResult) {
+            // Tool result message - extract only text blocks, skip tool_result
+            text = c.filter(function(b) { return b.type === 'text'; }).map(function(b) { return b.text || ''; }).join('\n');
+          } else {
+            text = c.filter(function(b) { return b.type === 'text'; }).map(function(b) { return b.text || ''; }).join('\n');
+          }
         }
-        // Strip system-reminder tags and surrounding noise
+        // Strip system-reminder tags
         text = stripSystemReminders(text);
         if (text.trim()) return text;
       }
     }
   } catch(e) {}
-  return body.slice(0, 500);
+  return '';
 }
 
 function stripSystemReminders(text) {

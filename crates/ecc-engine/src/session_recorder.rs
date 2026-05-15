@@ -152,12 +152,17 @@ fn parse_response(body: &str) -> (String, String) {
     if let Ok(obj) = serde_json::from_str::<serde_json::Value>(body) {
         let assistant = extract_text_from_json(&obj);
         let thinking = extract_thinking_from_json(&obj);
-        return (assistant, thinking);
+        let tool_uses = extract_tool_uses_from_json(&obj);
+        let full_assistant = combine_assistant_text(&assistant, &tool_uses);
+        return (full_assistant, thinking);
     }
 
     // Streaming SSE format
     let mut assistant = String::new();
     let mut thinking = String::new();
+    let mut tool_name = String::new();
+    let mut tool_input_json = String::new();
+    let mut tool_uses: Vec<String> = Vec::new();
 
     for line in body.lines() {
         let data = match line.strip_prefix("data: ") {
@@ -166,7 +171,36 @@ fn parse_response(body: &str) -> (String, String) {
         };
 
         if let Ok(obj) = serde_json::from_str::<serde_json::Value>(data) {
-            // Anthropic content_block_delta: text
+            let event_type = obj.get("type").and_then(|t| t.as_str()).unwrap_or("");
+
+            match event_type {
+                "content_block_start" => {
+                    if let Some(block) = obj.get("content_block") {
+                        if block.get("type").and_then(|t| t.as_str()) == Some("tool_use") {
+                            tool_name = block.get("name").and_then(|n| n.as_str()).unwrap_or("").to_string();
+                            tool_input_json.clear();
+                        }
+                    }
+                }
+                "content_block_stop" => {
+                    if !tool_name.is_empty() {
+                        tool_uses.push(format_tool_use(&tool_name, &tool_input_json));
+                        tool_name.clear();
+                        tool_input_json.clear();
+                    }
+                }
+                _ => {}
+            }
+
+            // input_json_delta for tool_use
+            if let Some(partial) = obj
+                .get("delta")
+                .and_then(|d| d.get("partial_json"))
+                .and_then(|t| t.as_str())
+            {
+                tool_input_json.push_str(partial);
+            }
+            // text delta
             if let Some(text) = obj
                 .get("delta")
                 .and_then(|d| d.get("text"))
@@ -174,7 +208,7 @@ fn parse_response(body: &str) -> (String, String) {
             {
                 assistant.push_str(text);
             }
-            // Anthropic content_block_delta: thinking
+            // thinking delta
             if let Some(text) = obj
                 .get("delta")
                 .and_then(|d| d.get("thinking"))
@@ -182,7 +216,7 @@ fn parse_response(body: &str) -> (String, String) {
             {
                 thinking.push_str(text);
             }
-            // OpenAI choices[0].delta.content
+            // OpenAI choices
             if let Some(text) = obj
                 .get("choices")
                 .and_then(|c| c.get(0))
@@ -195,7 +229,71 @@ fn parse_response(body: &str) -> (String, String) {
         }
     }
 
-    (assistant, thinking)
+    // Finalize any pending tool_use
+    if !tool_name.is_empty() {
+        tool_uses.push(format_tool_use(&tool_name, &tool_input_json));
+    }
+
+    let full_assistant = combine_assistant_text(&assistant, &tool_uses);
+    (full_assistant, thinking)
+}
+
+fn combine_assistant_text(text: &str, tool_uses: &[String]) -> String {
+    if text.is_empty() && tool_uses.is_empty() {
+        return String::new();
+    }
+    if text.is_empty() {
+        return tool_uses.join("\n");
+    }
+    if tool_uses.is_empty() {
+        return text.to_string();
+    }
+    format!("{}\n{}", text, tool_uses.join("\n"))
+}
+
+fn format_tool_use(name: &str, input_json: &str) -> String {
+    let input: serde_json::Value = serde_json::from_str(input_json).unwrap_or(serde_json::Value::Null);
+    match name {
+        "Edit" => {
+            let path = input.get("file_path").and_then(|p| p.as_str()).unwrap_or("?");
+            let new = input.get("new_string").and_then(|s| s.as_str()).unwrap_or("");
+            let preview = truncate(new, 120);
+            format!("[Edit] {}\n```{}\n```", path, preview)
+        }
+        "Write" => {
+            let path = input.get("file_path").and_then(|p| p.as_str()).unwrap_or("?");
+            format!("[Write] {}", path)
+        }
+        "Read" => {
+            let path = input.get("file_path").and_then(|p| p.as_str()).unwrap_or("?");
+            format!("[Read] {}", path)
+        }
+        "Bash" => {
+            let cmd = input.get("command").and_then(|c| c.as_str()).unwrap_or("?");
+            let display = truncate(cmd, 100);
+            format!("[Bash] {}", display)
+        }
+        _ => format!("[Tool: {}]", name),
+    }
+}
+
+fn truncate(s: &str, max: usize) -> &str {
+    if s.len() <= max { s } else { &s[..max] }
+}
+
+fn extract_tool_uses_from_json(obj: &serde_json::Value) -> Vec<String> {
+    let content = match obj.get("content").and_then(|c| c.as_array()) {
+        Some(c) => c,
+        None => return Vec::new(),
+    };
+    content.iter()
+        .filter(|b| b.get("type").and_then(|t| t.as_str()) == Some("tool_use"))
+        .filter_map(|b| {
+            let name = b.get("name").and_then(|n| n.as_str())?;
+            let input = b.get("input").cloned().unwrap_or(serde_json::Value::Null);
+            Some(format_tool_use(name, &input.to_string()))
+        })
+        .collect()
 }
 
 fn extract_text_from_json(obj: &serde_json::Value) -> String {

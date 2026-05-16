@@ -216,7 +216,7 @@ fn parse_response(body: &str) -> (String, String) {
             {
                 thinking.push_str(text);
             }
-            // OpenAI choices
+            // OpenAI choices — content
             if let Some(text) = obj
                 .get("choices")
                 .and_then(|c| c.get(0))
@@ -225,6 +225,16 @@ fn parse_response(body: &str) -> (String, String) {
                 .and_then(|t| t.as_str())
             {
                 assistant.push_str(text);
+            }
+            // OpenAI/GLM choices — reasoning_content
+            if let Some(text) = obj
+                .get("choices")
+                .and_then(|c| c.get(0))
+                .and_then(|c| c.get("delta"))
+                .and_then(|d| d.get("reasoning_content"))
+                .and_then(|t| t.as_str())
+            {
+                thinking.push_str(text);
             }
         }
     }
@@ -339,12 +349,26 @@ fn extract_text_from_json(obj: &serde_json::Value) -> String {
 }
 
 fn extract_thinking_from_json(obj: &serde_json::Value) -> String {
+    // Anthropic format: content array with thinking blocks
     if let Some(content) = obj.get("content").and_then(|c| c.as_array()) {
-        return content
+        let thinking: String = content
             .iter()
             .filter(|b| b.get("type").and_then(|t| t.as_str()) == Some("thinking"))
             .filter_map(|b| b.get("thinking").and_then(|t| t.as_str()))
             .collect();
+        if !thinking.is_empty() {
+            return thinking;
+        }
+    }
+    // OpenAI/GLM format: reasoning_content in message
+    if let Some(reasoning) = obj
+        .get("choices")
+        .and_then(|c| c.get(0))
+        .and_then(|c| c.get("message"))
+        .and_then(|m| m.get("reasoning_content"))
+        .and_then(|r| r.as_str())
+    {
+        return reasoning.to_string();
     }
     String::new()
 }

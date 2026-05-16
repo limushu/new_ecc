@@ -81,11 +81,22 @@ fn extract_stream_usage(chunks: &[Bytes]) -> Option<crate::context::TokenUsage> 
                 if data == "[DONE]" { continue; }
                 if let Ok(obj) = serde_json::from_str::<serde_json::Value>(data) {
                     if let Some(usage) = obj.get("usage") {
-                        return Some(crate::context::TokenUsage {
-                            input_tokens: usage.get("input_tokens").and_then(|v| v.as_u64()).unwrap_or(0),
-                            cache_read_tokens: usage.get("cache_read_input_tokens").and_then(|v| v.as_u64()).unwrap_or(0),
-                            output_tokens: usage.get("output_tokens").and_then(|v| v.as_u64()).unwrap_or(0),
-                        });
+                        // Anthropic format
+                        if let Some(inp) = usage.get("input_tokens").and_then(|v| v.as_u64()) {
+                            return Some(crate::context::TokenUsage {
+                                input_tokens: inp,
+                                cache_read_tokens: usage.get("cache_read_input_tokens").and_then(|v| v.as_u64()).unwrap_or(0),
+                                output_tokens: usage.get("output_tokens").and_then(|v| v.as_u64()).unwrap_or(0),
+                            });
+                        }
+                        // OpenAI format
+                        if let Some(inp) = usage.get("prompt_tokens").and_then(|v| v.as_u64()) {
+                            return Some(crate::context::TokenUsage {
+                                input_tokens: inp,
+                                cache_read_tokens: 0,
+                                output_tokens: usage.get("completion_tokens").and_then(|v| v.as_u64()).unwrap_or(0),
+                            });
+                        }
                     }
                 }
             }

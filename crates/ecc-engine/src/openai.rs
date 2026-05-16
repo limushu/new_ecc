@@ -49,7 +49,35 @@ impl ProtocolConverter for OpenAiConverter {
             }
             let chunk: serde_json::Value =
                 serde_json::from_str(data).map_err(|e| format!("invalid stream json: {e}"))?;
-            out.push(format!("data: {}\n\n", convert_stream_delta(&chunk)));
+
+            let delta = chunk
+                .get("choices")
+                .and_then(|c| c.get(0))
+                .and_then(|c| c.get("delta"));
+
+            // reasoning_content → thinking_delta (separate event)
+            if let Some(reasoning) = delta.as_ref().and_then(|d| d.get("reasoning_content")).and_then(|r| r.as_str()) {
+                if !reasoning.is_empty() {
+                    out.push(format!("data: {}\n\n", serde_json::json!({
+                        "type": "content_block_delta",
+                        "index": 0,
+                        "delta": { "type": "thinking_delta", "thinking": reasoning }
+                    })));
+                }
+            }
+
+            // content → text_delta
+            let text = delta
+                .and_then(|d| d.get("content"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            if !text.is_empty() {
+                out.push(format!("data: {}\n\n", serde_json::json!({
+                    "type": "content_block_delta",
+                    "index": 1,
+                    "delta": { "type": "text_delta", "text": text }
+                })));
+            }
         }
         Ok(out)
     }
@@ -94,6 +122,11 @@ fn anthropic_to_openai(body: &Bytes, model: &str) -> std::result::Result<Bytes, 
         dst.insert("stop".into(), v.clone());
     }
 
+    // Pass through thinking parameter for providers like GLM
+    if let Some(v) = src.get("thinking") {
+        dst.insert("thinking".into(), v.clone());
+    }
+
     serde_json::to_vec(&dst)
         .map(Bytes::from)
         .map_err(|e| format!("serialize failed: {e}"))
@@ -115,20 +148,40 @@ fn openai_to_anthropic(body: &Bytes) -> std::result::Result<Bytes, String> {
     dst.insert("type".into(), serde_json::Value::String("message".into()));
     dst.insert("role".into(), serde_json::Value::String("assistant".into()));
 
-    // content from choices[0].message.content
-    let content = src
+    // Build content array from choices[0].message
+    let mut content = Vec::new();
+    let msg = src
         .get("choices")
         .and_then(|c| c.get(0))
-        .and_then(|c| c.get("message"))
+        .and_then(|c| c.get("message"));
+
+    // reasoning_content → thinking block
+    if let Some(reasoning) = msg.and_then(|m| m.get("reasoning_content")).and_then(|r| r.as_str()) {
+        if !reasoning.is_empty() {
+            content.push(serde_json::json!({
+                "type": "thinking",
+                "thinking": reasoning,
+            }));
+        }
+    }
+
+    // content → text block
+    let text = msg
         .and_then(|m| m.get("content"))
         .and_then(|c| c.as_str())
         .unwrap_or("")
         .to_string();
+    if !text.is_empty() {
+        content.push(serde_json::json!({
+            "type": "text",
+            "text": text,
+        }));
+    }
 
-    dst.insert(
-        "content".into(),
-        serde_json::json!([{ "type": "text", "text": content }]),
-    );
+    if content.is_empty() {
+        content.push(serde_json::json!({ "type": "text", "text": "" }));
+    }
+    dst.insert("content".into(), serde_json::Value::Array(content));
 
     // model
     if let Some(m) = src.get("model") {
@@ -165,32 +218,6 @@ fn openai_to_anthropic(body: &Bytes) -> std::result::Result<Bytes, String> {
     serde_json::to_vec(&dst)
         .map(Bytes::from)
         .map_err(|e| format!("serialize failed: {e}"))
-}
-
-fn convert_stream_delta(chunk: &serde_json::Value) -> serde_json::Value {
-    let delta = chunk
-        .get("choices")
-        .and_then(|c| c.get(0))
-        .and_then(|c| c.get("delta"));
-
-    let mut result = serde_json::Map::new();
-    result.insert("type".into(), serde_json::Value::String("content_block_delta".into()));
-    result.insert("index".into(), serde_json::json!(0));
-
-    if let Some(delta) = delta {
-        let text = delta.get("content").and_then(|v| v.as_str()).unwrap_or("");
-        result.insert(
-            "delta".into(),
-            serde_json::json!({ "type": "text_delta", "text": text }),
-        );
-    } else {
-        result.insert(
-            "delta".into(),
-            serde_json::json!({ "type": "text_delta", "text": "" }),
-        );
-    }
-
-    serde_json::Value::Object(result)
 }
 
 fn content_to_text(content: &serde_json::Value) -> serde_json::Value {

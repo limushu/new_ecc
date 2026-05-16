@@ -20,15 +20,23 @@ impl Middleware for ThinkingRectifier {
             if let Some(body) = ctx.upstream_body.as_mut() {
                 if let Ok(mut obj) = serde_json::from_slice::<serde_json::Value>(body) {
                     if let Some(thinking) = obj.get_mut("thinking") {
-                        if thinking.get("type").and_then(|t| t.as_str()) == Some("adaptive") {
+                        let original_type = thinking.get("type").and_then(|t| t.as_str()).unwrap_or("?").to_string();
+                        if original_type == "adaptive" {
                             thinking["type"] = serde_json::Value::String("enabled".into());
                             if thinking.get("budget_tokens").is_none() {
                                 thinking["budget_tokens"] = serde_json::Value::Number(serde_json::Number::from(10000));
                             }
                             *body = serde_json::to_vec(&obj).unwrap_or_default().into();
+                            tracing::info!(original_type, "ThinkingRectifier: changed thinking to enabled");
+                        } else {
+                            tracing::debug!(original_type, "ThinkingRectifier: thinking type unchanged");
                         }
+                    } else {
+                        tracing::debug!("ThinkingRectifier: no thinking field in upstream_body");
                     }
                 }
+            } else {
+                tracing::debug!("ThinkingRectifier: upstream_body is None");
             }
             next.run(ctx).await
         })
